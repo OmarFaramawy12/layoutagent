@@ -10,7 +10,7 @@ add_library(json INTERFACE)
 target_include_directories(json INTERFACE ${CMAKE_SOURCE_DIR}/third_party)
 
 # Main program
-add_executable(myapp src/main.cpp)
+add_executable(myapp app/main.cpp)
 target_link_libraries(myapp PRIVATE json)
 
 # GoogleTest (downloaded automatically by CMake)

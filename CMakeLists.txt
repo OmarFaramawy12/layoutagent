@@ -27,3 +27,8 @@ target_link_libraries(hello_test PRIVATE json GTest::gtest_main)
 
 include(GoogleTest)
 gtest_discover_tests(hello_test)
+
+add_executable(test_rect tests/test_rect.cpp)
+target_include_directories(test_rect PRIVATE ${CMAKE_SOURCE_DIR}/src)
+target_link_libraries(test_rect PRIVATE GTest::gtest_main)
+gtest_discover_tests(test_rect)

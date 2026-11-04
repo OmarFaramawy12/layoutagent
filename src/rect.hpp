@@ -3,12 +3,13 @@ This is the Header File where, it contains the definition of the class Rect and 
 The Rect class represents a rectangle shape and provides functionality to manipulate and retrieve information about the rectangle.
 
 1- The Rect Class will contain the following member variables:
-   - x1: The x-coordinate of the top-left corner of the rectangle.
-   - y1: The y-coordinate of the top-left corner of the rectangle.
-   - x2: The x-coordinate of the bottom-right corner of the rectangle.
-   - y2: The y-coordinate of the bottom-right corner of the rectangle.      
-   Note: we used the top-left and bottom-right corners to define the rectangle. (we can define the length and width of the rectangle using corner coordinates)
-    coordinates)
+   - x1: The x-coordinate of the bottom-left corner of the rectangle.
+   - y1: The y-coordinate of the bottom-left corner of the rectangle.
+   - x2: The x-coordinate of the top-right corner of the rectangle.
+   - y2: The y-coordinate of the top-right corner of the rectangle.
+   - layer_id, shape_id: identify which layer the rectangle is on and which shape it is.
+   Note: we use the bottom-left and top-right corners to define the rectangle
+   (the width and height can be computed from the corner coordinates).
 
     
 
@@ -24,19 +25,19 @@ The Rect class represents a rectangle shape and provides functionality to manipu
 
     The Y axis grows upward
 
-    I- The rectangle layput must be having 2 points mainly: ()
+    I- The rectangle layout is defined by 2 points:
         1- Bottom-left point -> (x1 , y1)
-        2- Top-right point -> have y-cordinate greater than bottom-left coordinate (x2,y2)
+        2- Top-right point -> has x and y coordinates greater than bottom-left coordinate (x2,y2)
     
     II- Enforcing the Invariant => (x1,y1) < (x2,y2) for each x & y coordinate respectively
-        - Violating thr condition -> (x1 >= x2 & y1 >= y2)
+        - Violating the condition -> (x1 >= x2 OR y1 >= y2)
     
     In the designing phase, we have to ensure that the coordinates are valid. 
-    The bottom-right corner must be greater than the top-left corner, and the rectangle 
-    should not have zero width or zero length. 
+    The top-right corner must be greater than the bottom-left corner, and the rectangle
+    should not have zero width or zero height.
     If the coordinates are invalid, we will throw an exception to indicate an error.
 
-    Second: comuputing the Area with very large rectangle may cause overflow
+    Second: computing the area with very large rectangle may cause overflow
 
     Note: => Functions Inside a class are Inline by default
    
@@ -45,20 +46,20 @@ The Rect class represents a rectangle shape and provides functionality to manipu
 
 #pragma once
 
-// defining the memeber variables and member functions of the Rect class
+// defining the member variables and member functions of the Rect class
 #include <cstdint> // for int64_t
 #include <stdexcept> // for std::invalid_argument
 #include <string>
 
 namespace layoutagent{
-    const std::int64_t KMaxAbsCoordinate = 1'000'000'000;
+    inline constexpr std::int64_t KMaxAbsCoordinate = 1'000'000'000;
     
 
     class Rect{
     public:
 
         Rect(std::int64_t x1 , std::int64_t y1, std::int64_t x2 ,std::int64_t y2,
-             std::int64_t layer_id, std::int64_t shape_id) :  x1_(x1), y1_(y1), x2_(x2),
+             int layer_id, int shape_id) :  x1_(x1), y1_(y1), x2_(x2),
               y2_(y2),layer_id_(layer_id), shape_id_(shape_id) {
 
             if (x1 >= x2 || y1 >= y2) {

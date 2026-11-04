@@ -5,7 +5,7 @@
 
 #include "rect.hpp"
 
-using layoutagent::KMaxAbsCoordinate;
+using layoutagent::kMaxAbsCoord;
 using layoutagent::Rect;
 
 TEST(Rect, StoresValues) {
@@ -45,13 +45,13 @@ TEST(Rect, NegativeCoordinatesAreValid) {
 }
 
 TEST(Rect, CoordinatesAtTheLimitAreValid) {
-    EXPECT_NO_THROW(Rect(-KMaxAbsCoordinate, -KMaxAbsCoordinate,
-                         KMaxAbsCoordinate, KMaxAbsCoordinate, 0, 0));
+    EXPECT_NO_THROW(Rect(-kMaxAbsCoord, -kMaxAbsCoord,
+                         kMaxAbsCoord, kMaxAbsCoord, 0, 0));
 }
 
 TEST(Rect, CoordinatesBeyondTheLimitThrow) {
-    EXPECT_THROW(Rect(0, 0, KMaxAbsCoordinate + 1, 10, 0, 0), std::invalid_argument);
-    EXPECT_THROW(Rect(-KMaxAbsCoordinate - 1, 0, 10, 10, 0, 0), std::invalid_argument);
+    EXPECT_THROW(Rect(0, 0, kMaxAbsCoord + 1, 10, 0, 0), std::invalid_argument);
+    EXPECT_THROW(Rect(-kMaxAbsCoord - 1, 0, 10, 10, 0, 0), std::invalid_argument);
 }
 
 TEST(Rect, CanBeCopiedAssignedAndStoredInVector) {

@@ -52,7 +52,7 @@ The Rect class represents a rectangle shape and provides functionality to manipu
 #include <string>
 
 namespace layoutagent{
-    inline constexpr std::int64_t KMaxAbsCoordinate = 1'000'000'000;
+    inline constexpr std::int64_t kMaxAbsCoord = 1'000'000'000;
     
 
     class Rect{
@@ -72,7 +72,7 @@ namespace layoutagent{
             if (!in_range(x1) || !in_range(y1) || !in_range(x2) || !in_range(y2)) {
                 throw std::invalid_argument(
                     "Invalid Rect (shape " + std::to_string(shape_id) +
-                    "): coordinate outside +/-" + std::to_string(KMaxAbsCoordinate));
+                    "): coordinate outside +/-" + std::to_string(kMaxAbsCoord));
             }
 
         }
@@ -100,7 +100,7 @@ namespace layoutagent{
 
         static constexpr bool in_range(std::int64_t coordinate){
 
-            return coordinate >= -KMaxAbsCoordinate && coordinate <= KMaxAbsCoordinate;
+            return coordinate >= -kMaxAbsCoord && coordinate <= kMaxAbsCoord;
 
         }
 

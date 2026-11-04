@@ -1,9 +1,10 @@
 cmake_minimum_required(VERSION 3.20)
 project(LayoutAgent CXX)
 
-set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+add_compile_options(-Wall -Wextra)
 
 # nlohmann/json (single header, in third_party/)
 add_library(json INTERFACE)
@@ -32,3 +33,8 @@ add_executable(test_rect tests/test_rect.cpp)
 target_include_directories(test_rect PRIVATE ${CMAKE_SOURCE_DIR}/src)
 target_link_libraries(test_rect PRIVATE GTest::gtest_main)
 gtest_discover_tests(test_rect)
+
+add_executable(test_geometry tests/test_geometry.cpp)
+target_include_directories(test_geometry PRIVATE ${CMAKE_SOURCE_DIR}/src)
+target_link_libraries(test_geometry PRIVATE GTest::gtest_main)
+gtest_discover_tests(test_geometry)

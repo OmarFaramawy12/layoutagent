@@ -95,4 +95,4 @@ Or from the project root: `ctest --test-dir build --output-on-failure`. Never be
 
 If time runs short, cut in this order: stretch goals, CI, the evaluation set, clang-tidy. Never cut the tests or the naive-vs-grid equivalence test.
 
-**Current stage:** Rect and its tests (update this line as the project moves).
+**Current stage:** Violation, layers, and Layout (roadmap step 3). Steps 1-2 (Rect, geometry helpers) are done (update this line as the project moves).

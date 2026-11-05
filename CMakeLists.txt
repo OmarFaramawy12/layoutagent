@@ -45,8 +45,9 @@ target_link_libraries(test_violation PRIVATE GTest::gtest_main)
 gtest_discover_tests(test_violation)
 
 # Engine library: everything in src/ that has a .cpp file
-add_library(layoutagent_lib src/layout.cpp src/checks.cpp)
+add_library(layoutagent_lib src/layout.cpp src/checks.cpp src/io_json.cpp)
 target_include_directories(layoutagent_lib PUBLIC ${CMAKE_SOURCE_DIR}/src)
+target_link_libraries(layoutagent_lib PRIVATE json)
 
 add_executable(test_layout tests/test_layout.cpp)
 target_link_libraries(test_layout PRIVATE layoutagent_lib GTest::gtest_main)
@@ -55,3 +56,7 @@ gtest_discover_tests(test_layout)
 add_executable(test_checks tests/test_checks.cpp)
 target_link_libraries(test_checks PRIVATE layoutagent_lib GTest::gtest_main)
 gtest_discover_tests(test_checks)
+
+add_executable(test_io_json tests/test_io_json.cpp)
+target_link_libraries(test_io_json PRIVATE layoutagent_lib GTest::gtest_main)
+gtest_discover_tests(test_io_json)

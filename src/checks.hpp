@@ -31,7 +31,8 @@ std::vector<Violation> check_spacing(const Layout& layout, int layer_id,
 // that shares positive area, i.e. gap_x < 0 and gap_y < 0. Touching along an edge or at
 // a corner is not an overlap. Overlaps inside one layer are not reported.
 // first_shape_id is the shape on layer_a, second_shape_id the shape on layer_b.
-// measured and required are both 0 (overlap has no measured value).
+// measured is the overlap area (at most (2 * kMaxAbsCoord)^2 = 4e18, which fits in
+// int64_t); required is 0.
 // Violations come back ordered by the layer_a shape, then the layer_b shape.
 // Throws std::invalid_argument if layer_a == layer_b,
 // and std::out_of_range if a layer ID is unknown.

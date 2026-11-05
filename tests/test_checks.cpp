@@ -330,8 +330,44 @@ TEST(CheckOverlap, ViolationFieldsAreFilledIn) {
     EXPECT_EQ(result[0].first_shape_id, 0);
     ASSERT_TRUE(result[0].second_shape_id.has_value());
     EXPECT_EQ(*result[0].second_shape_id, 1);
-    EXPECT_EQ(result[0].measured, 0);
+    EXPECT_EQ(result[0].measured, 400);  // the via is 20 x 20 and fully inside
     EXPECT_EQ(result[0].required, 0);
+}
+
+TEST(CheckOverlap, MeasuredValueIsTheOverlapArea) {
+    Layout layout;
+    const int m1 = layout.add_layer("metal1");
+    const int v1 = layout.add_layer("via1");
+    layout.add_rect(m1, 0, 0, 100, 100);
+    layout.add_rect(v1, 90, 80, 130, 150);  // overlap is x 90..100 (10) by y 80..100 (20)
+
+    const auto result = check_overlap(layout, m1, v1);
+    ASSERT_EQ(result.size(), 1u);
+    EXPECT_EQ(result[0].measured, 200);
+}
+
+TEST(CheckOverlap, AreaIsTheSameWhicheverLayerComesFirst) {
+    Layout layout;
+    const int m1 = layout.add_layer("metal1");
+    const int v1 = layout.add_layer("via1");
+    layout.add_rect(m1, 0, 0, 100, 100);
+    layout.add_rect(v1, 90, 80, 130, 150);
+
+    EXPECT_EQ(check_overlap(layout, m1, v1)[0].measured, 200);
+    EXPECT_EQ(check_overlap(layout, v1, m1)[0].measured, 200);
+}
+
+TEST(CheckOverlap, LargestPossibleAreaDoesNotOverflow) {
+    Layout layout;
+    const int m1 = layout.add_layer("metal1");
+    const int m2 = layout.add_layer("metal2");
+    layout.add_rect(m1, -kMaxAbsCoord, -kMaxAbsCoord, kMaxAbsCoord, kMaxAbsCoord);
+    layout.add_rect(m2, -kMaxAbsCoord, -kMaxAbsCoord, kMaxAbsCoord, kMaxAbsCoord);
+
+    const auto result = check_overlap(layout, m1, m2);
+    ASSERT_EQ(result.size(), 1u);
+    // (2e9) * (2e9) = 4e18, which still fits in int64_t (max about 9.22e18)
+    EXPECT_EQ(result[0].measured, 4'000'000'000'000'000'000);
 }
 
 TEST(CheckOverlap, ArgumentOrderDecidesWhichShapeIsFirst) {

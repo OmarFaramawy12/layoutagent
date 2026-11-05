@@ -15,6 +15,7 @@ enum class ViolationType {
 // - Width and spacing are same-layer checks, so layer_a == layer_b.
 // - second_shape_id is empty when only one shape is involved (width).
 // - Spacing: measured is the squared distance, required is S*S.
+// - Overlap: measured is the overlap area, required is 0.
 struct Violation {
     ViolationType type;
     int layer_a;

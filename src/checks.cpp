@@ -91,12 +91,15 @@ std::vector<Violation> check_overlap(const Layout& layout, int layer_a, int laye
     for (const Rect& a : rects_a) {
         for (const Rect& b : rects_b) {
             if (overlaps(a, b)) {
+                // Both gaps are negative here, and minus a gap is the size of the shared
+                // part along that axis. So the product of the two gaps is the area.
+                const std::int64_t overlap_area = gap_x(a, b) * gap_y(a, b);
                 result.push_back({.type = ViolationType::Overlap,
                                   .layer_a = layer_a,
                                   .layer_b = layer_b,
                                   .first_shape_id = a.shape_id(),
                                   .second_shape_id = b.shape_id(),
-                                  .measured = 0,
+                                  .measured = overlap_area,
                                   .required = 0});
             }
         }

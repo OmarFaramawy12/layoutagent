@@ -38,3 +38,16 @@ add_executable(test_geometry tests/test_geometry.cpp)
 target_include_directories(test_geometry PRIVATE ${CMAKE_SOURCE_DIR}/src)
 target_link_libraries(test_geometry PRIVATE GTest::gtest_main)
 gtest_discover_tests(test_geometry)
+
+add_executable(test_violation tests/test_violation.cpp)
+target_include_directories(test_violation PRIVATE ${CMAKE_SOURCE_DIR}/src)
+target_link_libraries(test_violation PRIVATE GTest::gtest_main)
+gtest_discover_tests(test_violation)
+
+# Engine library: everything in src/ that has a .cpp file
+add_library(layoutagent_lib src/layout.cpp)
+target_include_directories(layoutagent_lib PUBLIC ${CMAKE_SOURCE_DIR}/src)
+
+add_executable(test_layout tests/test_layout.cpp)
+target_link_libraries(test_layout PRIVATE layoutagent_lib GTest::gtest_main)
+gtest_discover_tests(test_layout)

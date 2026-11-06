@@ -5,12 +5,22 @@
 #include <stdexcept>
 #include <string>
 
+#include <cstdint>
+#include <optional>
+#include <vector>
+
+#include <nlohmann/json.hpp>
+
 #include "io_json.hpp"
 #include "layout.hpp"
+#include "violation.hpp"
 
 using layoutagent::Layout;
 using layoutagent::load_layout;
 using layoutagent::parse_layout;
+using layoutagent::Violation;
+using layoutagent::ViolationType;
+using layoutagent::violations_to_json;
 
 // ---- good input ----
 
@@ -161,4 +171,131 @@ TEST(LoadLayout, ReadsAFile) {
 
 TEST(LoadLayout, MissingFileThrows) {
     EXPECT_THROW(load_layout("this_file_does_not_exist.json"), std::runtime_error);
+}
+
+// ---- violations_to_json ----
+
+namespace {
+
+// Parses the text from violations_to_json and returns its "violations" array.
+nlohmann::json parse_violations(const std::string& text) {
+    const nlohmann::json document = nlohmann::json::parse(text);
+    return document.at("violations");
+}
+
+Layout two_layer_layout() {
+    Layout layout;
+    layout.add_layer("metal1");  // layer 0
+    layout.add_layer("via1");    // layer 1
+    return layout;
+}
+
+}  // namespace
+
+TEST(ViolationsToJson, NoViolationsGivesAnEmptyArray) {
+    const nlohmann::json list = parse_violations(violations_to_json(two_layer_layout(), {}));
+    EXPECT_TRUE(list.is_array());
+    EXPECT_TRUE(list.empty());
+}
+
+TEST(ViolationsToJson, WidthViolationHasANullSecondShape) {
+    const std::vector<Violation> violations = {{.type = ViolationType::MinWidth,
+                                                .layer_a = 0,
+                                                .layer_b = 0,
+                                                .first_shape_id = 7,
+                                                .second_shape_id = std::nullopt,
+                                                .measured = 30,
+                                                .required = 50}};
+
+    const nlohmann::json list = parse_violations(violations_to_json(two_layer_layout(), violations));
+    ASSERT_EQ(list.size(), 1u);
+    const nlohmann::json& item = list[0];
+    EXPECT_EQ(item.size(), 7u);  // exactly these seven keys
+    EXPECT_EQ(item.at("type").get<std::string>(), "min_width");
+    EXPECT_EQ(item.at("layer_a").get<std::string>(), "metal1");
+    EXPECT_EQ(item.at("layer_b").get<std::string>(), "metal1");
+    EXPECT_EQ(item.at("first_shape_id").get<int>(), 7);
+    EXPECT_TRUE(item.at("second_shape_id").is_null());
+    EXPECT_EQ(item.at("measured").get<std::int64_t>(), 30);
+    EXPECT_EQ(item.at("required").get<std::int64_t>(), 50);
+}
+
+TEST(ViolationsToJson, SpacingViolationHasBothShapes) {
+    const std::vector<Violation> violations = {{.type = ViolationType::MinSpacing,
+                                                .layer_a = 1,
+                                                .layer_b = 1,
+                                                .first_shape_id = 3,
+                                                .second_shape_id = 9,
+                                                .measured = 81,
+                                                .required = 1600}};
+
+    const nlohmann::json list = parse_violations(violations_to_json(two_layer_layout(), violations));
+    ASSERT_EQ(list.size(), 1u);
+    EXPECT_EQ(list[0].at("type").get<std::string>(), "min_spacing");
+    EXPECT_EQ(list[0].at("first_shape_id").get<int>(), 3);
+    EXPECT_EQ(list[0].at("second_shape_id").get<int>(), 9);
+    EXPECT_EQ(list[0].at("measured").get<std::int64_t>(), 81);
+    EXPECT_EQ(list[0].at("required").get<std::int64_t>(), 1600);
+}
+
+TEST(ViolationsToJson, OverlapUsesTwoLayerNamesNotIds) {
+    const std::vector<Violation> violations = {{.type = ViolationType::Overlap,
+                                                .layer_a = 0,
+                                                .layer_b = 1,
+                                                .first_shape_id = 4,
+                                                .second_shape_id = 12,
+                                                .measured = 400,
+                                                .required = 0}};
+
+    const nlohmann::json list = parse_violations(violations_to_json(two_layer_layout(), violations));
+    ASSERT_EQ(list.size(), 1u);
+    EXPECT_EQ(list[0].at("type").get<std::string>(), "overlap");
+    EXPECT_EQ(list[0].at("layer_a").get<std::string>(), "metal1");
+    EXPECT_EQ(list[0].at("layer_b").get<std::string>(), "via1");
+}
+
+TEST(ViolationsToJson, KeepsTheOrderOfTheViolations) {
+    std::vector<Violation> violations;
+    for (int id : {5, 2, 8}) {
+        violations.push_back({.type = ViolationType::MinWidth,
+                              .layer_a = 0,
+                              .layer_b = 0,
+                              .first_shape_id = id,
+                              .second_shape_id = std::nullopt,
+                              .measured = 1,
+                              .required = 2});
+    }
+
+    const nlohmann::json list = parse_violations(violations_to_json(two_layer_layout(), violations));
+    ASSERT_EQ(list.size(), 3u);
+    EXPECT_EQ(list[0].at("first_shape_id").get<int>(), 5);
+    EXPECT_EQ(list[1].at("first_shape_id").get<int>(), 2);
+    EXPECT_EQ(list[2].at("first_shape_id").get<int>(), 8);
+}
+
+TEST(ViolationsToJson, LargeValuesStayExactIntegers) {
+    const std::vector<Violation> violations = {{.type = ViolationType::Overlap,
+                                                .layer_a = 0,
+                                                .layer_b = 1,
+                                                .first_shape_id = 0,
+                                                .second_shape_id = 1,
+                                                .measured = 4'000'000'000'000'000'000,
+                                                .required = 0}};
+
+    const nlohmann::json list = parse_violations(violations_to_json(two_layer_layout(), violations));
+    ASSERT_EQ(list.size(), 1u);
+    EXPECT_TRUE(list[0].at("measured").is_number_integer());  // not a rounded double
+    EXPECT_EQ(list[0].at("measured").get<std::int64_t>(), 4'000'000'000'000'000'000);
+}
+
+TEST(ViolationsToJson, UnknownLayerIdThrows) {
+    const std::vector<Violation> violations = {{.type = ViolationType::MinWidth,
+                                                .layer_a = 5,
+                                                .layer_b = 5,
+                                                .first_shape_id = 0,
+                                                .second_shape_id = std::nullopt,
+                                                .measured = 1,
+                                                .required = 2}};
+
+    EXPECT_THROW(violations_to_json(two_layer_layout(), violations), std::out_of_range);
 }

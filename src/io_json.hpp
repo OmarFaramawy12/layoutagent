@@ -1,8 +1,10 @@
 #pragma once
 
 #include <string>
+#include <vector>
 
 #include "layout.hpp"
+#include "violation.hpp"
 
 namespace layoutagent {
 
@@ -18,5 +20,15 @@ Layout parse_layout(const std::string& json_text);
 // Reads a file and calls parse_layout on its content.
 // Throws std::runtime_error if the file cannot be opened.
 Layout load_layout(const std::string& path);
+
+// Turns violations into JSON text (pretty-printed, 2 spaces):
+//   {"violations": [{"type": "min_spacing", "layer_a": "metal1", "layer_b": "metal1",
+//                    "first_shape_id": 2, "second_shape_id": 7,
+//                    "measured": 81, "required": 1600}, ...]}
+// The keys are the field names of Violation. "type" is "min_width", "min_spacing" or
+// "overlap"; the layers are given by name (looked up in the layout); "second_shape_id" is
+// null when there is no second shape. The order of the violations is kept.
+// Throws std::out_of_range if a violation has a layer ID the layout does not know.
+std::string violations_to_json(const Layout& layout, const std::vector<Violation>& violations);
 
 }  // namespace layoutagent

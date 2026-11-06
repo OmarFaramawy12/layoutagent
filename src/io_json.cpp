@@ -36,6 +36,19 @@ std::int64_t read_coordinate(const Json& value, const std::string& where) {
     return value.get<std::int64_t>();
 }
 
+const char* violation_type_name(ViolationType type) {
+    switch (type) {
+        case ViolationType::MinWidth:
+            return "min_width";
+        case ViolationType::MinSpacing:
+            return "min_spacing";
+        case ViolationType::Overlap:
+            return "overlap";
+    }
+    // Only reachable if a new ViolationType is added and this switch is not updated.
+    throw std::logic_error("violation_type_name: unknown ViolationType");
+}
+
 void add_rect_from_json(Layout& layout, int layer_id, const std::string& layer_name,
                         std::size_t index, const Json& rect_json) {
     const std::string where = "layer '" + layer_name + "', rect " + std::to_string(index);
@@ -102,6 +115,29 @@ Layout load_layout(const std::string& path) {
     std::ostringstream text;
     text << file.rdbuf();  // copies the whole file into the string stream
     return parse_layout(text.str());
+}
+
+std::string violations_to_json(const Layout& layout, const std::vector<Violation>& violations) {
+    Json list = Json::array();
+    for (const Violation& violation : violations) {
+        Json item;  // starts as null; the first item["key"] = ... turns it into an object
+        item["type"] = violation_type_name(violation.type);
+        item["layer_a"] = layout.layer_name(violation.layer_a);
+        item["layer_b"] = layout.layer_name(violation.layer_b);
+        item["first_shape_id"] = violation.first_shape_id;
+        if (violation.second_shape_id.has_value()) {
+            item["second_shape_id"] = *violation.second_shape_id;
+        } else {
+            item["second_shape_id"] = nullptr;  // JSON null
+        }
+        item["measured"] = violation.measured;
+        item["required"] = violation.required;
+        list.push_back(item);
+    }
+
+    Json document;
+    document["violations"] = list;
+    return document.dump(2);  // 2 = indent with two spaces
 }
 
 }  // namespace layoutagent

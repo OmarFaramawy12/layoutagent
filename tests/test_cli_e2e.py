@@ -130,6 +130,68 @@ class HandWrittenLayoutTest(unittest.TestCase):
                               ("a", "b", 0, 1, 25)])   # shared area 5 x 5
 
 
+class WindowTest(unittest.TestCase):
+    """--window LAYER X1 Y1 X2 Y2 prints the IDs of the shapes that intersect the window."""
+
+    LAYOUT = ('{"layers": {"metal1": [[0, 0, 10, 10], [20, 0, 30, 10], [100, 100, 110, 110]],'
+              ' "via1": [[5, 5, 8, 8]]}}')
+
+    @classmethod
+    def setUpClass(cls):
+        cls.folder = tempfile.TemporaryDirectory()
+        cls.path = write_file(cls.folder.name, "window.json", cls.LAYOUT)
+
+    @classmethod
+    def tearDownClass(cls):
+        cls.folder.cleanup()
+
+    def window(self, *args):
+        result = run_cli(self.path, "--window", *args)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(result.stderr, "")
+        return json.loads(result.stdout)
+
+    def test_returns_the_ids_of_the_shapes_in_the_window(self):
+        self.assertEqual(self.window("metal1", "5", "5", "25", "8"), {"shape_ids": [0, 1]})
+
+    def test_ids_are_global_across_layers(self):
+        self.assertEqual(self.window("via1", "0", "0", "100", "100"), {"shape_ids": [3]})
+
+    def test_an_empty_window_gives_an_empty_list(self):
+        self.assertEqual(self.window("metal1", "500", "500", "600", "600"), {"shape_ids": []})
+
+    def test_touching_the_window_edge_is_not_inside(self):
+        # shape 0 ends exactly at x = 10, where this window starts
+        self.assertEqual(self.window("metal1", "10", "0", "20", "10"), {"shape_ids": []})
+
+    def test_the_window_may_come_before_the_layout_path(self):
+        result = run_cli("--window", "metal1", "5", "5", "25", "8", self.path)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(json.loads(result.stdout), {"shape_ids": [0, 1]})
+
+    def test_output_ends_with_a_newline(self):
+        result = run_cli(self.path, "--window", "metal1", "0", "0", "10", "10")
+        self.assertTrue(result.stdout.endswith("\n"))
+
+
+class WindowOnGeneratedLayoutTest(unittest.TestCase):
+    def test_a_window_over_everything_returns_every_shape_of_the_layer(self):
+        with tempfile.TemporaryDirectory() as folder:
+            layout_path, _ = generate_case(folder, 3, 60)
+            with open(layout_path) as f:
+                layers = json.load(f)["layers"]
+
+            first_id = 0  # shape IDs count layer by layer, in file order
+            for name, rects in layers.items():
+                with self.subTest(layer=name):
+                    result = run_cli(layout_path, "--window", name,
+                                     "-100000", "-100000", "100000", "100000")
+                    self.assertEqual(result.returncode, 0, result.stderr)
+                    self.assertEqual(json.loads(result.stdout)["shape_ids"],
+                                     list(range(first_id, first_id + len(rects))))
+                first_id += len(rects)
+
+
 class ErrorsTest(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
@@ -187,7 +249,35 @@ class ErrorsTest(unittest.TestCase):
         self.assert_fails([self.good, "--min-width", "50", "--min-width", "60"], 2,
                           "--min-width", "usage:")
 
+    def test_window_needs_five_values(self):
+        self.assert_fails([self.good, "--window", "metal1", "0", "0"], 2, "--window", "usage:")
+
+    def test_window_values_must_be_integers(self):
+        self.assert_fails([self.good, "--window", "metal1", "0", "0", "abc", "10"], 2, "abc", "usage:")
+
+    def test_window_cannot_be_combined_with_checks(self):
+        self.assert_fails([self.good, "--window", "metal1", "0", "0", "10", "10",
+                           "--min-width", "50"], 2, "--window", "combined", "usage:")
+
+    def test_window_given_twice(self):
+        self.assert_fails([self.good, "--window", "metal1", "0", "0", "10", "10",
+                           "--window", "via1", "0", "0", "10", "10"], 2, "--window", "usage:")
+
+    def test_window_must_have_a_positive_size(self):
+        self.assert_fails([self.good, "--window", "metal1", "10", "0", "0", "10"], 2,
+                          "Invalid window", "usage:")
+        self.assert_fails([self.good, "--window", "metal1", "5", "0", "5", "10"], 2,
+                          "Invalid window", "usage:")
+
+    def test_window_coordinates_out_of_range(self):
+        self.assert_fails([self.good, "--window", "metal1", "0", "0", "2000000000", "10"], 2,
+                          "Invalid window", "usage:")
+
     # ---- runtime errors: exit code 1 ----
+
+    def test_window_on_an_unknown_layer(self):
+        self.assert_fails([self.good, "--window", "ghost", "0", "0", "10", "10"], 1, "ghost")
+
 
     def test_missing_file(self):
         self.assert_fails(["no_such_file.json", "--min-width", "50"], 1, "no_such_file.json")

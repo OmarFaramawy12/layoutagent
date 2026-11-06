@@ -1,7 +1,10 @@
 // The command-line program:
 //   layoutagent <layout.json> [--min-width W] [--min-spacing S] [--overlap LAYER_A LAYER_B]...
+//   layoutagent <layout.json> --window LAYER X1 Y1 X2 Y2
 //
-// Prints the violations as JSON on stdout. Errors go to stderr as "error: ...".
+// The first form prints the violations as JSON on stdout. The second prints the IDs of the
+// shapes on LAYER that intersect the window, as {"shape_ids": [...]}; it cannot be combined
+// with the checks. Errors go to stderr as "error: ...".
 // Exit codes: 0 = the checks ran (with or without violations), 1 = runtime error
 // (bad file, unknown layer name), 2 = usage error (bad command line).
 
@@ -28,14 +31,25 @@ using layoutagent::check_spacing;
 using layoutagent::check_width;
 using layoutagent::Layout;
 using layoutagent::load_layout;
+using layoutagent::shape_ids_to_json;
 using layoutagent::Violation;
 using layoutagent::violations_to_json;
+using layoutagent::window_query;
 
 namespace {
 
 const char* const kUsage =
-    "usage: layoutagent <layout.json> [--min-width W] [--min-spacing S] "
-    "[--overlap LAYER_A LAYER_B]...";
+    "usage: layoutagent <layout.json> ([--min-width W] [--min-spacing S] "
+    "[--overlap LAYER_A LAYER_B]... | --window LAYER X1 Y1 X2 Y2)";
+
+// The arguments of --window.
+struct Window {
+    std::string layer;
+    std::int64_t x1 = 0;
+    std::int64_t y1 = 0;
+    std::int64_t x2 = 0;
+    std::int64_t y2 = 0;
+};
 
 // What the command line asked for.
 struct Options {
@@ -43,6 +57,7 @@ struct Options {
     std::optional<std::int64_t> min_width;    // empty = do not run this check
     std::optional<std::int64_t> min_spacing;  // empty = do not run this check
     std::vector<std::pair<std::string, std::string>> overlaps;
+    std::optional<Window> window;             // empty = no window query
 };
 
 // Returns the argument after args[i] and moves i forward by one, so the loop in
@@ -91,6 +106,17 @@ Options parse_arguments(const std::vector<std::string>& args) {
             const std::string& layer_a = take_value(args, i, arg);
             const std::string& layer_b = take_value(args, i, arg);
             options.overlaps.push_back({layer_a, layer_b});  // push_back makes its own copies
+        } else if (arg == "--window") {
+            if (options.window) {
+                throw std::invalid_argument("--window given more than once");
+            }
+            Window window;
+            window.layer = take_value(args, i, arg);
+            window.x1 = parse_int(take_value(args, i, arg), arg);
+            window.y1 = parse_int(take_value(args, i, arg), arg);
+            window.x2 = parse_int(take_value(args, i, arg), arg);
+            window.y2 = parse_int(take_value(args, i, arg), arg);
+            options.window = window;
         } else if (arg.rfind("--", 0) == 0) {  // starts with "--"
             throw std::invalid_argument("unknown option " + arg);
         } else {
@@ -105,9 +131,15 @@ Options parse_arguments(const std::vector<std::string>& args) {
     if (!have_path) {
         throw std::invalid_argument("missing layout file");
     }
-    if (!options.min_width && !options.min_spacing && options.overlaps.empty()) {
+    const bool has_check =
+        options.min_width || options.min_spacing || !options.overlaps.empty();
+    if (options.window && has_check) {
         throw std::invalid_argument(
-            "nothing to check: give --min-width, --min-spacing or --overlap");
+            "--window cannot be combined with --min-width, --min-spacing or --overlap");
+    }
+    if (!options.window && !has_check) {
+        throw std::invalid_argument(
+            "nothing to check: give --min-width, --min-spacing, --overlap or --window");
     }
     return options;
 }
@@ -122,6 +154,14 @@ int run(const std::vector<std::string>& args, std::ostream& out, std::ostream& e
     try {
         const Options options = parse_arguments(args);
         const Layout layout = load_layout(options.layout_path);
+
+        if (options.window) {
+            const Window& window = *options.window;
+            const std::vector<int> shape_ids = window_query(
+                layout, layout.layer_id(window.layer), window.x1, window.y1, window.x2, window.y2);
+            out << shape_ids_to_json(shape_ids) << '\n';
+            return 0;
+        }
 
         std::vector<Violation> violations;
         if (options.min_width) {

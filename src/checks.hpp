@@ -42,7 +42,7 @@ std::vector<Violation> check_overlap(const Layout& layout, int layer_a, int laye
 // with the window (x1, y1) - (x2, y2). Touching the window along an edge or at a corner
 // is not inside. The IDs are the global shape IDs, in the order the shapes were added.
 // The window follows the Rect rules (x1 < x2, y1 < y2, coordinates within +/- kMaxAbsCoord).
-// Throws std::invalid_argument if the window is invalid,
+// Throws std::invalid_argument ("Invalid window: ...") if the window is invalid,
 // and std::out_of_range if the layer ID is unknown.
 std::vector<int> window_query(const Layout& layout, int layer_id, std::int64_t x1,
                               std::int64_t y1, std::int64_t x2, std::int64_t y2);

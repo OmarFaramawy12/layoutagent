@@ -74,4 +74,11 @@ if(Python3_FOUND)
            WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
   set_tests_properties(cli_e2e_python_tests PROPERTIES
                        ENVIRONMENT "LAYOUTAGENT_CLI=$<TARGET_FILE:layoutagent>")
+
+  # Tests of the LLM tool layer in agent/tools.py (no network, no API key needed)
+  add_test(NAME agent_tools_python_tests
+           COMMAND ${Python3_EXECUTABLE} -m unittest discover -s ${CMAKE_SOURCE_DIR}/tests -p test_agent_tools.py
+           WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
+  set_tests_properties(agent_tools_python_tests PROPERTIES
+                       ENVIRONMENT "LAYOUTAGENT_CLI=$<TARGET_FILE:layoutagent>")
 endif()

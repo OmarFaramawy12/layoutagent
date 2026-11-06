@@ -1,6 +1,7 @@
 #include <gtest/gtest.h>
 
 #include <stdexcept>
+#include <string>
 
 #include "checks.hpp"
 #include "layout.hpp"
@@ -523,4 +524,18 @@ TEST(WindowQuery, UnknownLayerThrows) {
     Layout layout;
     layout.add_layer("metal1");
     EXPECT_THROW(window_query(layout, 4, 0, 0, 10, 10), std::out_of_range);
+}
+
+TEST(WindowQuery, InvalidWindowMessageTalksAboutTheWindowNotAShape) {
+    Layout layout;
+    const int m1 = layout.add_layer("metal1");
+    try {
+        window_query(layout, m1, 10, 0, 0, 10);
+        FAIL() << "expected std::invalid_argument";
+    } catch (const std::invalid_argument& e) {
+        const std::string message = e.what();
+        EXPECT_NE(message.find("window"), std::string::npos) << message;
+        EXPECT_NE(message.find("x1=10"), std::string::npos) << message;  // shows the bad values
+        EXPECT_EQ(message.find("shape"), std::string::npos) << message;  // no placeholder ID
+    }
 }

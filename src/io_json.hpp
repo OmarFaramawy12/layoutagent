@@ -31,4 +31,8 @@ Layout load_layout(const std::string& path);
 // Throws std::out_of_range if a violation has a layer ID the layout does not know.
 std::string violations_to_json(const Layout& layout, const std::vector<Violation>& violations);
 
+// Turns the result of a window query into JSON text: {"shape_ids": [7, 2, 9]}.
+// The order of the IDs is kept; no shapes gives an empty array.
+std::string shape_ids_to_json(const std::vector<int>& shape_ids);
+
 }  // namespace layoutagent

@@ -18,6 +18,7 @@
 using layoutagent::Layout;
 using layoutagent::load_layout;
 using layoutagent::parse_layout;
+using layoutagent::shape_ids_to_json;
 using layoutagent::Violation;
 using layoutagent::ViolationType;
 using layoutagent::violations_to_json;
@@ -286,6 +287,20 @@ TEST(ViolationsToJson, LargeValuesStayExactIntegers) {
     ASSERT_EQ(list.size(), 1u);
     EXPECT_TRUE(list[0].at("measured").is_number_integer());  // not a rounded double
     EXPECT_EQ(list[0].at("measured").get<std::int64_t>(), 4'000'000'000'000'000'000);
+}
+
+// ---- shape_ids_to_json ----
+
+TEST(ShapeIdsToJson, NoIdsGivesAnEmptyArray) {
+    const nlohmann::json document = nlohmann::json::parse(shape_ids_to_json({}));
+    EXPECT_EQ(document.size(), 1u);  // only the "shape_ids" key
+    EXPECT_TRUE(document.at("shape_ids").is_array());
+    EXPECT_TRUE(document.at("shape_ids").empty());
+}
+
+TEST(ShapeIdsToJson, KeepsTheIdsInOrder) {
+    const nlohmann::json document = nlohmann::json::parse(shape_ids_to_json({7, 2, 9}));
+    EXPECT_EQ(document.at("shape_ids").get<std::vector<int>>(), (std::vector<int>{7, 2, 9}));
 }
 
 TEST(ViolationsToJson, UnknownLayerIdThrows) {

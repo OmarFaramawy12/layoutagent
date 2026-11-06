@@ -140,4 +140,10 @@ std::string violations_to_json(const Layout& layout, const std::vector<Violation
     return document.dump(2);  // 2 = indent with two spaces
 }
 
+std::string shape_ids_to_json(const std::vector<int>& shape_ids) {
+    Json document;
+    document["shape_ids"] = shape_ids;  // a vector<int> becomes a JSON array (empty -> [])
+    return document.dump(2);
+}
+
 }  // namespace layoutagent

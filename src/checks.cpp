@@ -30,6 +30,22 @@ bool overlaps(const Rect& a, const Rect& b) {
     return gap_x(a, b) < 0 && gap_y(a, b) < 0;
 }
 
+// Checks a window with the Rect rules (x1 < x2, y1 < y2, coordinates within +/- kMaxAbsCoord)
+// by building a Rect: its constructor does the validation. The layer and shape IDs mean
+// nothing for a window, so they are -1. The error message talks about the window, because
+// the Rect message would mention a "shape -1".
+Rect make_window(std::int64_t x1, std::int64_t y1, std::int64_t x2, std::int64_t y2) {
+    try {
+        return Rect(x1, y1, x2, y2, -1, -1);
+    } catch (const std::invalid_argument&) {
+        throw std::invalid_argument(
+            "Invalid window: need x1 < x2 and y1 < y2, with all values within +/-" +
+            std::to_string(kMaxAbsCoord) + ", got x1=" + std::to_string(x1) +
+            " y1=" + std::to_string(y1) + " x2=" + std::to_string(x2) +
+            " y2=" + std::to_string(y2));
+    }
+}
+
 }  // namespace
 
 std::vector<Violation> check_width(const Layout& layout, int layer_id,
@@ -109,9 +125,7 @@ std::vector<Violation> check_overlap(const Layout& layout, int layer_a, int laye
 
 std::vector<int> window_query(const Layout& layout, int layer_id, std::int64_t x1,
                               std::int64_t y1, std::int64_t x2, std::int64_t y2) {
-    // Building a Rect makes its constructor validate the window (it throws if invalid).
-    // The layer and shape IDs are not meaningful for a window, so we use -1.
-    const Rect window(x1, y1, x2, y2, -1, -1);
+    const Rect window = make_window(x1, y1, x2, y2);
 
     std::vector<int> ids;
     for (const Rect& rect : layout.rects(layer_id)) {

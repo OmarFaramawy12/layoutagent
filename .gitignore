@@ -1,4 +1,5 @@
 build/
 Testing/
 __pycache__/
+.vscode/
 CLAUDE.md

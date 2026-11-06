@@ -1,3 +1,4 @@
 build/
 Testing/
+__pycache__/
 CLAUDE.md

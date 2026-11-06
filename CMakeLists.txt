@@ -60,3 +60,11 @@ gtest_discover_tests(test_checks)
 add_executable(test_io_json tests/test_io_json.cpp)
 target_link_libraries(test_io_json PRIVATE layoutagent_lib GTest::gtest_main)
 gtest_discover_tests(test_io_json)
+
+# Python tests for tools/gen_layout.py (standard-library unittest, no extra packages)
+find_package(Python3 COMPONENTS Interpreter)
+if(Python3_FOUND)
+  add_test(NAME gen_layout_python_tests
+           COMMAND ${Python3_EXECUTABLE} -m unittest discover -s ${CMAKE_SOURCE_DIR}/tests -p test_gen_layout.py
+           WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
+endif()

@@ -22,6 +22,9 @@ public:
     int layer_id(const std::string& name) const;
     const std::string& layer_name(int id) const;
 
+    // Number of layers. Valid layer IDs are 0 .. layer_count() - 1.
+    int layer_count() const;
+
     // Adds a rectangle to a layer and returns its shape ID. Shape IDs are
     // unique across all layers: 0, 1, 2, ... in the order rects are added.
     // Throws std::out_of_range if the layer ID is unknown, and

@@ -1,8 +1,165 @@
-#include <iostream>
-#include <nlohmann/json.hpp>
+// The command-line program:
+//   layoutagent <layout.json> [--min-width W] [--min-spacing S] [--overlap LAYER_A LAYER_B]...
+//
+// Prints the violations as JSON on stdout. Errors go to stderr as "error: ...".
+// Exit codes: 0 = the checks ran (with or without violations), 1 = runtime error
+// (bad file, unknown layer name), 2 = usage error (bad command line).
 
-int main() {
-    nlohmann::json j = {{"hello", "world"}};
-    std::cout << j.dump() << "\n";
-    return 0;
+#include <charconv>      // std::from_chars
+#include <cstddef>       // std::size_t
+#include <cstdint>
+#include <exception>
+#include <iostream>
+#include <optional>
+#include <ostream>
+#include <stdexcept>
+#include <string>
+#include <system_error>  // std::errc
+#include <utility>       // std::pair
+#include <vector>
+
+#include "checks.hpp"
+#include "io_json.hpp"
+#include "layout.hpp"
+#include "violation.hpp"
+
+using layoutagent::check_overlap;
+using layoutagent::check_spacing;
+using layoutagent::check_width;
+using layoutagent::Layout;
+using layoutagent::load_layout;
+using layoutagent::Violation;
+using layoutagent::violations_to_json;
+
+namespace {
+
+const char* const kUsage =
+    "usage: layoutagent <layout.json> [--min-width W] [--min-spacing S] "
+    "[--overlap LAYER_A LAYER_B]...";
+
+// What the command line asked for.
+struct Options {
+    std::string layout_path;
+    std::optional<std::int64_t> min_width;    // empty = do not run this check
+    std::optional<std::int64_t> min_spacing;  // empty = do not run this check
+    std::vector<std::pair<std::string, std::string>> overlaps;
+};
+
+// Returns the argument after args[i] and moves i forward by one, so the loop in
+// parse_arguments does not look at the value again. "i" is a non-const reference
+// (std::size_t&): changing it here changes the caller's variable.
+const std::string& take_value(const std::vector<std::string>& args, std::size_t& i,
+                              const std::string& option) {
+    if (i + 1 >= args.size()) {
+        throw std::invalid_argument(option + " needs a value");
+    }
+    ++i;
+    return args[i];
+}
+
+// Converts the WHOLE text to an integer ("12x" and "1.5" are errors, unlike std::stoll
+// which would quietly stop at the first bad character).
+std::int64_t parse_int(const std::string& text, const std::string& option) {
+    std::int64_t value = 0;
+    const char* first = text.data();
+    const char* last = text.data() + text.size();
+    const std::from_chars_result result = std::from_chars(first, last, value);
+    if (result.ec != std::errc() || result.ptr != last) {
+        throw std::invalid_argument(option + " needs an integer, got '" + text + "'");
+    }
+    return value;
+}
+
+// Every problem with the command line is reported by throwing std::invalid_argument.
+Options parse_arguments(const std::vector<std::string>& args) {
+    Options options;
+    bool have_path = false;
+
+    for (std::size_t i = 0; i < args.size(); ++i) {
+        const std::string& arg = args[i];
+        if (arg == "--min-width") {
+            if (options.min_width) {
+                throw std::invalid_argument("--min-width given more than once");
+            }
+            options.min_width = parse_int(take_value(args, i, arg), arg);
+        } else if (arg == "--min-spacing") {
+            if (options.min_spacing) {
+                throw std::invalid_argument("--min-spacing given more than once");
+            }
+            options.min_spacing = parse_int(take_value(args, i, arg), arg);
+        } else if (arg == "--overlap") {
+            const std::string& layer_a = take_value(args, i, arg);
+            const std::string& layer_b = take_value(args, i, arg);
+            options.overlaps.push_back({layer_a, layer_b});  // push_back makes its own copies
+        } else if (arg.rfind("--", 0) == 0) {  // starts with "--"
+            throw std::invalid_argument("unknown option " + arg);
+        } else {
+            if (have_path) {
+                throw std::invalid_argument("only one layout file is allowed");
+            }
+            options.layout_path = arg;
+            have_path = true;
+        }
+    }
+
+    if (!have_path) {
+        throw std::invalid_argument("missing layout file");
+    }
+    if (!options.min_width && !options.min_spacing && options.overlaps.empty()) {
+        throw std::invalid_argument(
+            "nothing to check: give --min-width, --min-spacing or --overlap");
+    }
+    return options;
+}
+
+void append(std::vector<Violation>& all, const std::vector<Violation>& more) {
+    all.insert(all.end(), more.begin(), more.end());
+}
+
+// Runs the program and returns the exit code. Everything is written to the streams that are
+// passed in (std::cout and std::cerr in main).
+int run(const std::vector<std::string>& args, std::ostream& out, std::ostream& err) {
+    try {
+        const Options options = parse_arguments(args);
+        const Layout layout = load_layout(options.layout_path);
+
+        std::vector<Violation> violations;
+        if (options.min_width) {
+            for (int id = 0; id < layout.layer_count(); ++id) {
+                append(violations, check_width(layout, id, *options.min_width));
+            }
+        }
+        if (options.min_spacing) {
+            for (int id = 0; id < layout.layer_count(); ++id) {
+                append(violations, check_spacing(layout, id, *options.min_spacing));
+            }
+        }
+        for (const auto& pair : options.overlaps) {
+            append(violations, check_overlap(layout, layout.layer_id(pair.first),
+                                             layout.layer_id(pair.second)));
+        }
+
+        // Printed only when everything succeeded, so a failed run never leaves
+        // half an answer on stdout.
+        out << violations_to_json(layout, violations) << '\n';
+        return 0;
+    } catch (const std::invalid_argument& error) {
+        // A bad command line, or a rule value / layer pair the checks refused.
+        // (load_layout reports bad files as std::runtime_error, so they do not end up here.)
+        err << "error: " << error.what() << '\n' << kUsage << '\n';
+        return 2;
+    } catch (const std::exception& error) {
+        err << "error: " << error.what() << '\n';
+        return 1;
+    }
+}
+
+}  // namespace
+
+int main(int argc, char** argv) {
+    std::vector<std::string> args;
+    for (int i = 1; i < argc; ++i) {  // argv[0] is the program name
+        args.push_back(argv[i]);
+    }
+    return run(args, std::cout, std::cerr);
 }

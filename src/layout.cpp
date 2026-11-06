@@ -28,6 +28,10 @@ const std::string& Layout::layer_name(int id) const {
     return id_to_name_[id];
 }
 
+int Layout::layer_count() const {
+    return static_cast<int>(id_to_name_.size());
+}
+
 int Layout::add_rect(int layer_id, std::int64_t x1, std::int64_t y1,
                      std::int64_t x2, std::int64_t y2) {
     check_layer_id(layer_id);

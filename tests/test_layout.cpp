@@ -14,6 +14,15 @@ TEST(Layout, LayerIdsAreAssignedInOrderStartingAtZero) {
     EXPECT_EQ(layout.add_layer("metal2"), 2);
 }
 
+TEST(Layout, LayerCountGrowsWithEachLayer) {
+    Layout layout;
+    EXPECT_EQ(layout.layer_count(), 0);
+    layout.add_layer("metal1");
+    EXPECT_EQ(layout.layer_count(), 1);
+    layout.add_layer("via1");
+    EXPECT_EQ(layout.layer_count(), 2);
+}
+
 TEST(Layout, NameToIdAndIdToNameRoundTrip) {
     Layout layout;
     layout.add_layer("metal1");

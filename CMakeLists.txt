@@ -11,8 +11,8 @@ add_library(json INTERFACE)
 target_include_directories(json INTERFACE ${CMAKE_SOURCE_DIR}/third_party)
 
 # Main program
-add_executable(myapp app/main.cpp)
-target_link_libraries(myapp PRIVATE json)
+add_executable(layoutagent app/main.cpp)
+target_link_libraries(layoutagent PRIVATE layoutagent_lib)
 
 # GoogleTest (downloaded automatically by CMake)
 include(FetchContent)
@@ -67,4 +67,11 @@ if(Python3_FOUND)
   add_test(NAME gen_layout_python_tests
            COMMAND ${Python3_EXECUTABLE} -m unittest discover -s ${CMAKE_SOURCE_DIR}/tests -p test_gen_layout.py
            WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
+
+  # End-to-end tests of the built command-line program (needs the layoutagent target built)
+  add_test(NAME cli_e2e_python_tests
+           COMMAND ${Python3_EXECUTABLE} -m unittest discover -s ${CMAKE_SOURCE_DIR}/tests -p test_cli_e2e.py
+           WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
+  set_tests_properties(cli_e2e_python_tests PROPERTIES
+                       ENVIRONMENT "LAYOUTAGENT_CLI=$<TARGET_FILE:layoutagent>")
 endif()

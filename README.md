@@ -250,6 +250,20 @@ model. After fixing the scoring, all 9 cases pass. The `get_shape` case, added l
 own and passes too (about 3,700 tokens), so all 10 cases pass; the full set was not re-run. The scoring weakness that remains is
 documented in `eval/scoring.py`: numbers are looked up anywhere in the text.
 
+## Demo
+
+`demo/run_demo.sh` is a scripted walk-through for a screen recording. It uses a small hand-made
+layout (`demo/demo_layout.json`) and changes one input at a time, so you can see the output
+change: a tighter width rule gives more violations, a larger spacing rule catches the second
+gap, and so on.
+
+```
+demo/run_demo.sh engine   # the C++ program alone, no API key needed
+source .env && demo/run_demo.sh agent   # the same kind of questions through the LLM
+```
+
+`DEMO_PAUSE=3` changes the pause between steps (default 2 seconds).
+
 ## How it is tested
 
 - **GoogleTest** unit tests for every C++ piece: `Rect`, geometry helpers, `Layout`, each check,

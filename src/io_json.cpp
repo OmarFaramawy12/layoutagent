@@ -4,9 +4,11 @@
 #include <cstdint>
 #include <fstream>
 #include <limits>
+#include <set>
 #include <sstream>
 #include <stdexcept>
 #include <string>
+#include <vector>
 
 #include <nlohmann/json.hpp>
 
@@ -72,12 +74,46 @@ void add_rect_from_json(Layout& layout, int layer_id, const std::string& layer_n
     }
 }
 
+// Parses the text like Json::parse, but throws std::runtime_error if any JSON object has the
+// same key twice. The JSON library itself silently keeps only one of the two values, which
+// would make a repeated layer name lose a whole list of rects without a word.
+//
+// It uses the library's "parse callback": a function the parser calls for every event while it
+// reads the text (an object starts, a key is read, an object ends, ...).
+Json parse_rejecting_duplicate_keys(const std::string& json_text) {
+    // One set of keys for every object that is open right now (objects can be nested): a new
+    // set when an object starts, dropped when it ends. A key that is already in the newest
+    // set is a duplicate. Equal keys in different objects are fine.
+    std::vector<std::set<std::string>> open_objects;
+
+    // A lambda is a small function written in place. The [&open_objects] part is its
+    // "capture": the lambda may use (and change) the variable open_objects of the enclosing
+    // function, by reference.
+    const auto on_event = [&open_objects](int /*depth*/, Json::parse_event_t event,
+                                          Json& parsed) {
+        if (event == Json::parse_event_t::object_start) {
+            open_objects.emplace_back();
+        } else if (event == Json::parse_event_t::object_end) {
+            open_objects.pop_back();
+        } else if (event == Json::parse_event_t::key) {
+            const std::string key = parsed.get<std::string>();
+            const bool is_new = open_objects.back().insert(key).second;
+            if (!is_new) {
+                throw std::runtime_error("Duplicate key '" + key +
+                                         "' in a JSON object (a layer name may appear only once)");
+            }
+        }
+        return true;  // true = keep the value; this function only watches
+    };
+    return Json::parse(json_text, on_event);
+}
+
 }  // namespace
 
 Layout parse_layout(const std::string& json_text) {
     Json document;
     try {
-        document = Json::parse(json_text);
+        document = parse_rejecting_duplicate_keys(json_text);
     } catch (const Json::parse_error& error) {
         throw std::runtime_error(std::string("Invalid JSON: ") + error.what());
     }

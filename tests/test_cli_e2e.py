@@ -201,6 +201,9 @@ class ErrorsTest(unittest.TestCase):
         cls.broken = write_file(cls.folder.name, "broken.json", "{not json")
         cls.bad_rect = write_file(cls.folder.name, "bad_rect.json",
                                   '{"layers": {"metal1": [[5, 0, 5, 10]]}}')
+        cls.duplicate_layer = write_file(
+            cls.folder.name, "duplicate_layer.json",
+            '{"layers": {"metal1": [[0, 0, 10, 10]], "metal1": [[20, 0, 30, 10]]}}')
 
     @classmethod
     def tearDownClass(cls):
@@ -294,6 +297,9 @@ class ErrorsTest(unittest.TestCase):
 
     def test_invalid_json(self):
         self.assert_fails([self.broken, "--min-width", "50"], 1, "Invalid JSON")
+
+    def test_duplicate_layer_name(self):
+        self.assert_fails([self.duplicate_layer, "--min-width", "50"], 1, "Duplicate key", "metal1")
 
     def test_invalid_rect_names_the_layer(self):
         self.assert_fails([self.bad_rect, "--min-width", "50"], 1, "metal1", "rect 0")

@@ -90,6 +90,11 @@ layer), `2` a usage error (bad command line).
 Each rect is `[x1, y1, x2, y2]`: lower-left and upper-right corner, as JSON integers in
 nanometres, with `x1 < x2`, `y1 < y2` and every value within +/- 1,000,000,000.
 
+A key that appears twice inside one JSON object, for example a layer name used twice, is an
+error (`Duplicate key 'metal1' in a JSON object ...`). JSON parsers normally keep only one of
+the two values without a word, which would silently drop a whole list of rects, so the C++
+loader checks for repeats while parsing, and the Python tool layer applies the same rule.
+
 ### The file-order assumption
 
 Layer IDs and shape IDs are **not stored in the file**. The loader assigns them from the
@@ -273,8 +278,6 @@ documented in `eval/scoring.py`: numbers are looked up anywhere in the text.
 ## Limitations
 
 - Only axis-aligned rectangles. No polygons, no rotation, no hierarchy.
-- A layout file with the same layer name twice is not rejected: the JSON library silently keeps
-  one of them. Detecting it would need a streaming parser.
 - The grid's cell size is the larger of S and the largest shape side, so a single huge shape
   makes the cells huge and the check slow (still correct). Layouts with bounded shape sizes,
   like the generated ones, do not have this problem.

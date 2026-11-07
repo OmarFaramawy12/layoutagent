@@ -298,6 +298,19 @@ class ConstructionTest(FakeProgramTestCase):
                 with self.assertRaises(ValueError):
                     tools.DrcTools(self.layout_path, program=["unused"])
 
+    def test_duplicate_layer_name(self):
+        # Python's json module keeps the last of two equal keys without a word; the C++ loader
+        # rejects such a file, so the tool layer must not accept it either.
+        with open(self.layout_path, "w") as f:
+            f.write('{"layers": {"metal1": [[0, 0, 10, 10]], "metal1": [[20, 0, 30, 10]]}}')
+        with self.assertRaisesRegex(ValueError, "Duplicate key 'metal1'"):
+            tools.DrcTools(self.layout_path, program=["unused"])
+
+    def test_the_same_key_in_different_objects_is_fine(self):
+        with open(self.layout_path, "w") as f:
+            f.write('{"layers": {"metal1": []}, "meta": {"metal1": 1}}')
+        self.assertEqual(tools.DrcTools(self.layout_path, program=["unused"]).layer_names, ["metal1"])
+
     def test_layout_that_is_not_json(self):
         with open(self.layout_path, "w") as f:
             f.write("{not json")

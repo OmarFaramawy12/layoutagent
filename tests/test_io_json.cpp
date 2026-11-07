@@ -92,6 +92,31 @@ TEST(ParseLayout, InvalidJsonThrows) {
     EXPECT_THROW(parse_layout(""), std::runtime_error);
 }
 
+// The JSON library would silently keep only one of two equal keys, so the loader has to check
+// for repeats while parsing. A repeated layer name would otherwise lose a whole list of rects.
+TEST(ParseLayout, ADuplicateLayerNameIsRejected) {
+    try {
+        parse_layout(R"({"layers": {"metal1": [[0, 0, 10, 10]], "via1": [], "metal1": [[20, 0, 30, 10]]}})");
+        FAIL() << "expected std::runtime_error";
+    } catch (const std::runtime_error& e) {
+        const std::string message = e.what();
+        EXPECT_NE(message.find("Duplicate key 'metal1'"), std::string::npos) << message;
+    }
+}
+
+TEST(ParseLayout, ADuplicateKeyInAnyObjectIsRejected) {
+    EXPECT_THROW(parse_layout(R"({"layers": {}, "layers": {"metal1": []}})"), std::runtime_error);
+    EXPECT_THROW(parse_layout(R"({"layers": {}, "meta": {"a": 1, "a": 2}})"), std::runtime_error);
+}
+
+// Only keys of the SAME object count. Equal keys in different objects are fine, and layer
+// names are case sensitive.
+TEST(ParseLayout, TheSameKeyInDifferentObjectsIsFine) {
+    const Layout layout = parse_layout(
+        R"({"layers": {"metal1": [], "Metal1": []}, "meta": {"metal1": 1}, "other": {"metal1": 2}})");
+    EXPECT_EQ(layout.layer_count(), 2);
+}
+
 TEST(ParseLayout, TopLevelMustBeAnObjectWithLayers) {
     EXPECT_THROW(parse_layout("[]"), std::runtime_error);
     EXPECT_THROW(parse_layout("{}"), std::runtime_error);

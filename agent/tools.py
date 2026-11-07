@@ -39,10 +39,22 @@ def default_program_path():
     return os.environ.get("LAYOUTAGENT_CLI", os.path.join(root, "build", "layoutagent"))
 
 
+def object_without_duplicate_keys(pairs):
+    """json.load calls this for every JSON object, with its (key, value) pairs in file order.
+    Python normally keeps the last of two equal keys without a word; the C++ loader rejects
+    such files, so the tool layer does too."""
+    result = {}
+    for key, value in pairs:
+        if key in result:
+            raise ValueError("Duplicate key '" + key + "' in a JSON object")
+        result[key] = value
+    return result
+
+
 def read_layer_names(layout_path):
     """The layer names of a layout file, in file order. (Reading names is not geometry.)"""
     with open(layout_path) as f:
-        data = json.load(f)
+        data = json.load(f, object_pairs_hook=object_without_duplicate_keys)
     layers = data.get("layers") if isinstance(data, dict) else None
     if not isinstance(layers, dict) or not layers:
         raise ValueError(layout_path + ': expected {"layers": {...}} with at least one layer')

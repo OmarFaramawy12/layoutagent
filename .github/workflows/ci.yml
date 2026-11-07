@@ -30,6 +30,25 @@ jobs:
       - name: Test
         run: ctest --test-dir build --output-on-failure
 
+  # The whole suite with Microsoft's compiler (MSVC). The default CMake generator on this
+  # runner is Visual Studio, which can build several configurations in one build folder, so the
+  # configuration is named when building and when testing. The sanitizer build and clang-tidy
+  # are Linux-only jobs.
+  windows:
+    name: Build and test (Windows MSVC, ${{ matrix.build_type }})
+    runs-on: windows-2022
+    strategy:
+      matrix:
+        build_type: [Debug, Release]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Configure
+        run: cmake -S . -B build
+      - name: Build
+        run: cmake --build build --config ${{ matrix.build_type }}
+      - name: Test
+        run: ctest --test-dir build -C ${{ matrix.build_type }} --output-on-failure
+
   # The same tests under AddressSanitizer and UndefinedBehaviorSanitizer.
   sanitizers:
     name: Tests under ASan and UBSan

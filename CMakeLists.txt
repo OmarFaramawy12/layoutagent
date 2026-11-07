@@ -4,7 +4,13 @@ project(LayoutAgent CXX)
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
-add_compile_options(-Wall -Wextra)
+if(MSVC)
+  # MSVC does not know -Wall/-Wextra. /W4 is its usual warning level (its /Wall also warns
+  # about the standard library headers themselves). /utf-8 makes it read sources as UTF-8.
+  add_compile_options(/W4 /utf-8)
+else()
+  add_compile_options(-Wall -Wextra)
+endif()
 
 # Sanitizers (off by default). Use a separate build directory:
 #   cmake -S . -B build-asan -G Ninja -DCMAKE_BUILD_TYPE=Debug -DLAYOUTAGENT_SANITIZE=ON
@@ -51,6 +57,11 @@ endif()
 
 # GoogleTest (downloaded automatically by CMake)
 include(FetchContent)
+if(MSVC)
+  # GoogleTest must use the same C runtime library as the rest of the project on Windows,
+  # otherwise linking fails (this is the setting the GoogleTest documentation recommends).
+  set(gtest_force_shared_crt ON CACHE BOOL "" FORCE)
+endif()
 FetchContent_Declare(googletest
   URL https://github.com/google/googletest/archive/refs/tags/v1.14.0.zip
   DOWNLOAD_EXTRACT_TIMESTAMP TRUE)

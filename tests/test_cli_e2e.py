@@ -262,6 +262,23 @@ class ErrorsTest(unittest.TestCase):
             self.assert_fails([self.good, *window, *check], 2, "combined", "usage:")
             self.assert_fails([self.good, *check, *window], 2, "combined", "usage:")  # either order
 
+    def test_shape_needs_a_value(self):
+        self.assert_fails([self.good, "--shape"], 2, "--shape", "usage:")
+
+    def test_shape_value_must_be_a_whole_integer(self):
+        self.assert_fails([self.good, "--shape", "abc"], 2, "abc", "usage:")
+        self.assert_fails([self.good, "--shape", "1.5"], 2, "1.5", "usage:")
+
+    def test_shape_given_twice(self):
+        self.assert_fails([self.good, "--shape", "0", "--shape", "1"], 2, "--shape", "usage:")
+
+    def test_shape_cannot_be_combined_with_checks_or_a_window(self):
+        for other in (["--min-width", "50"], ["--min-spacing", "40"],
+                      ["--overlap", "metal1", "via1"],
+                      ["--window", "metal1", "0", "0", "10", "10"]):
+            self.assert_fails([self.good, "--shape", "0", *other], 2, "combined", "usage:")
+            self.assert_fails([self.good, *other, "--shape", "0"], 2, "combined", "usage:")
+
     def test_window_needs_five_values(self):
         self.assert_fails([self.good, "--window", "metal1", "0", "0"], 2, "--window", "usage:")
 
@@ -298,6 +315,11 @@ class ErrorsTest(unittest.TestCase):
     def test_invalid_json(self):
         self.assert_fails([self.broken, "--min-width", "50"], 1, "Invalid JSON")
 
+    def test_unknown_shape_id(self):
+        self.assert_fails([self.good, "--shape", "2"], 1, "Unknown shape id", "2")  # ids are 0 and 1
+        self.assert_fails([self.good, "--shape", "-1"], 1, "Unknown shape id", "-1")
+        self.assert_fails([self.good, "--shape", "99999999999"], 1, "Unknown shape id")
+
     def test_duplicate_layer_name(self):
         self.assert_fails([self.duplicate_layer, "--min-width", "50"], 1, "Duplicate key", "metal1")
 
@@ -306,6 +328,38 @@ class ErrorsTest(unittest.TestCase):
 
     def test_unknown_layer_name(self):
         self.assert_fails([self.good, "--overlap", "metal1", "nope"], 1, "nope")
+
+
+class ShapeQueryTest(unittest.TestCase):
+    """--shape ID prints the layer name and the corners of one shape."""
+
+    @classmethod
+    def setUpClass(cls):
+        cls.folder = tempfile.TemporaryDirectory()
+        cls.layout_path, _ = generate_case(cls.folder.name, 3, 12)
+        with open(cls.layout_path) as f:
+            layers = json.load(f)["layers"]
+        # The ID rule from the README: shape IDs count 0, 1, 2, ... layer by layer, in file order.
+        cls.shapes = [(layer, rect) for layer, rects in layers.items() for rect in rects]
+
+    @classmethod
+    def tearDownClass(cls):
+        cls.folder.cleanup()
+
+    def test_every_shape_is_reported_with_its_layer_and_corners(self):
+        self.assertGreater(len(self.shapes), 10)
+        for shape_id, (layer, rect) in enumerate(self.shapes):
+            with self.subTest(shape_id=shape_id):
+                result = run_cli(self.layout_path, "--shape", str(shape_id))
+                self.assertEqual(result.returncode, 0, result.stderr)
+                self.assertEqual(json.loads(result.stdout), {"shape": {
+                    "id": shape_id, "layer": layer,
+                    "x1": rect[0], "y1": rect[1], "x2": rect[2], "y2": rect[3]}})
+
+    def test_the_id_after_the_last_shape_is_unknown(self):
+        result = run_cli(self.layout_path, "--shape", str(len(self.shapes)))
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("Unknown shape id", result.stderr)
 
 
 if __name__ == "__main__":

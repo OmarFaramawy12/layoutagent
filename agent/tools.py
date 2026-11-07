@@ -206,6 +206,24 @@ class DrcTools:
                     "additionalProperties": False,
                 },
             },
+            {
+                "name": "get_shape",
+                "description": (
+                    "Looks up one shape by its shape ID (the IDs that appear in violations and "
+                    "in window query results) and returns its layer and its position: the "
+                    "lower-left corner (x1, y1) and the upper-right corner (x2, y2) in nm, with "
+                    "the y axis growing upward. Use it when you need to say where a shape is or "
+                    "how big it is; the other tools give IDs only."),
+                "input_schema": {
+                    "type": "object",
+                    "properties": {
+                        "shape_id": {"type": "integer",
+                                     "description": "The shape ID, 0 or more."},
+                    },
+                    "required": ["shape_id"],
+                    "additionalProperties": False,
+                },
+            },
         ]
 
     # ---- running a tool call ----
@@ -217,6 +235,7 @@ class DrcTools:
             "check_min_spacing": self._check_min_spacing,
             "check_overlap": self._check_overlap,
             "window_query": self._window_query,
+            "get_shape": self._get_shape,
         }
         if name not in handlers:
             return ToolResult("unknown tool '" + name + "'. Available tools: " +
@@ -252,6 +271,14 @@ class DrcTools:
         if error:
             return error
         return limited_answer(shape_ids, MAX_SHAPE_IDS_RETURNED, "shape_ids")
+
+    def _get_shape(self, arguments):
+        check_arguments(arguments, required=["shape_id"])
+        shape_id = require_int(arguments, "shape_id")
+        shape, error = self._call_program(["--shape", str(shape_id)], "shape")
+        if error:  # for example an unknown shape ID: the program says so
+            return error
+        return ToolResult(json.dumps(shape, separators=(",", ":")), False)
 
     def _layer(self, value, key):
         if not isinstance(value, str) or value not in self.layer_names:

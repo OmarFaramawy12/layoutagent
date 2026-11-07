@@ -26,6 +26,8 @@ def build_system_prompt(layer_names):
         "take the square root to talk about nm. For overlap violations, 'measured' is the "
         "overlap area in nm squared. For width violations, 'measured' and 'required' are in "
         "nm.\n"
+        "Violations and window queries give shape IDs, not positions: if you need a shape's "
+        "layer or coordinates, call get_shape with its ID instead of guessing.\n"
         "If the question lacks a number you need (such as a minimum width), ask the user "
         "instead of inventing one. If a tool returns an error, fix the call and try again."
     )

@@ -47,6 +47,17 @@ const std::vector<Rect>& Layout::rects(int layer_id) const {
     return layer_rects_[layer_id];
 }
 
+const Rect& Layout::find_rect(std::int64_t shape_id) const {
+    for (const std::vector<Rect>& rects : layer_rects_) {
+        for (const Rect& rect : rects) {
+            if (rect.shape_id() == shape_id) {
+                return rect;  // a reference to the rect stored in the layout, not a copy
+            }
+        }
+    }
+    throw std::out_of_range("Unknown shape id: " + std::to_string(shape_id));
+}
+
 void Layout::check_layer_id(int id) const {
     if (id < 0 || id >= static_cast<int>(id_to_name_.size())) {
         throw std::out_of_range("Unknown layer id: " + std::to_string(id));

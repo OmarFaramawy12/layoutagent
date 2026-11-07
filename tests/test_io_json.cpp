@@ -19,6 +19,7 @@ using layoutagent::Layout;
 using layoutagent::load_layout;
 using layoutagent::parse_layout;
 using layoutagent::shape_ids_to_json;
+using layoutagent::shape_to_json;
 using layoutagent::Violation;
 using layoutagent::ViolationType;
 using layoutagent::violations_to_json;
@@ -338,4 +339,25 @@ TEST(ViolationsToJson, UnknownLayerIdThrows) {
                                                 .required = 2}};
 
     EXPECT_THROW(violations_to_json(two_layer_layout(), violations), std::out_of_range);
+}
+
+// ---- shape_to_json ----
+
+TEST(ShapeToJson, HasTheIdTheLayerNameAndTheCorners) {
+    Layout layout;
+    layout.add_layer("metal1");
+    const int via1 = layout.add_layer("via1");
+    layout.add_rect(0, 0, 0, 10, 10);                     // shape 0
+    layout.add_rect(via1, -1000000000, -5, 7, 1000000000);  // shape 1
+
+    const auto document = nlohmann::json::parse(shape_to_json(layout, layout.find_rect(1)));
+    ASSERT_TRUE(document.contains("shape"));
+    const auto& shape = document["shape"];
+    EXPECT_EQ(shape["id"], 1);
+    EXPECT_EQ(shape["layer"], "via1");  // by name, not by ID
+    EXPECT_EQ(shape["x1"], -1000000000);
+    EXPECT_EQ(shape["y1"], -5);
+    EXPECT_EQ(shape["x2"], 7);
+    EXPECT_EQ(shape["y2"], 1000000000);
+    EXPECT_EQ(shape.size(), 6u);  // nothing else in there
 }

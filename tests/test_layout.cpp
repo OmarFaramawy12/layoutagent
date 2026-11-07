@@ -131,3 +131,55 @@ TEST(Layout, InvalidRectThrowsAndDoesNotUseUpAShapeId) {
     EXPECT_TRUE(layout.rects(m1).empty());
     EXPECT_EQ(layout.add_rect(m1, 0, 0, 10, 10), 0);  // still the first ID
 }
+
+// ---- find_rect (look up a shape by its global shape ID) ----
+
+TEST(Layout, FindRectReturnsTheShapeWithThatId) {
+    Layout layout;
+    const int m1 = layout.add_layer("metal1");
+    const int via1 = layout.add_layer("via1");
+    layout.add_rect(m1, 0, 0, 10, 10);       // shape 0
+    layout.add_rect(via1, 5, 6, 7, 9);       // shape 1
+    layout.add_rect(m1, -20, -30, 40, 50);   // shape 2
+
+    const auto& rect = layout.find_rect(1);
+    EXPECT_EQ(rect.shape_id(), 1);
+    EXPECT_EQ(rect.layer_id(), via1);
+    EXPECT_EQ(rect.x1(), 5);
+    EXPECT_EQ(rect.y1(), 6);
+    EXPECT_EQ(rect.x2(), 7);
+    EXPECT_EQ(rect.y2(), 9);
+
+    EXPECT_EQ(layout.find_rect(2).x1(), -20);
+}
+
+// Rects may be added to the layers in any order, so the shapes of one layer do not have
+// consecutive IDs (metal1 holds shapes 0 and 2 here). The lookup must not assume they do.
+TEST(Layout, FindRectWorksWhenIdsAreNotGroupedByLayer) {
+    Layout layout;
+    const int m1 = layout.add_layer("metal1");
+    const int via1 = layout.add_layer("via1");
+    layout.add_rect(m1, 0, 0, 10, 10);
+    layout.add_rect(via1, 100, 100, 110, 110);
+    layout.add_rect(m1, 200, 200, 210, 210);
+
+    EXPECT_EQ(layout.find_rect(0).layer_id(), m1);
+    EXPECT_EQ(layout.find_rect(1).layer_id(), via1);
+    EXPECT_EQ(layout.find_rect(2).layer_id(), m1);
+}
+
+TEST(Layout, FindRectOfAnUnknownIdThrows) {
+    Layout layout;
+    const int m1 = layout.add_layer("metal1");
+    layout.add_rect(m1, 0, 0, 10, 10);
+
+    EXPECT_NO_THROW(layout.find_rect(0));
+    EXPECT_THROW(layout.find_rect(1), std::out_of_range);
+    EXPECT_THROW(layout.find_rect(-1), std::out_of_range);
+    EXPECT_THROW(layout.find_rect(1000000000000), std::out_of_range);  // does not fit in an int
+}
+
+TEST(Layout, FindRectOnAnEmptyLayoutThrows) {
+    Layout layout;
+    EXPECT_THROW(layout.find_rect(0), std::out_of_range);
+}

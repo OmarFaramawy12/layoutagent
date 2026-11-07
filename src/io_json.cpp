@@ -182,4 +182,18 @@ std::string shape_ids_to_json(const std::vector<int>& shape_ids) {
     return document.dump(2);
 }
 
+std::string shape_to_json(const Layout& layout, const Rect& rect) {
+    Json shape;  // ordered_json: the keys come out in the order they are set here
+    shape["id"] = rect.shape_id();
+    shape["layer"] = layout.layer_name(rect.layer_id());
+    shape["x1"] = rect.x1();
+    shape["y1"] = rect.y1();
+    shape["x2"] = rect.x2();
+    shape["y2"] = rect.y2();
+
+    Json document;
+    document["shape"] = shape;
+    return document.dump(2);
+}
+
 }  // namespace layoutagent

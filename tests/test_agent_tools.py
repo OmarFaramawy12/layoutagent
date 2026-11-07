@@ -74,10 +74,11 @@ class FakeProgramTestCase(unittest.TestCase):
 
 
 class DefinitionsTest(FakeProgramTestCase):
-    def test_four_tools_with_descriptions_and_schemas(self):
+    def test_the_tools_with_descriptions_and_schemas(self):
         definitions = self.make_tools().definitions()
         self.assertEqual([d["name"] for d in definitions],
-                         ["check_min_width", "check_min_spacing", "check_overlap", "window_query"])
+                         ["check_min_width", "check_min_spacing", "check_overlap", "window_query",
+                          "get_shape"])
         for definition in definitions:
             self.assertTrue(definition["description"].strip())
             schema = definition["input_schema"]
@@ -106,6 +107,11 @@ class DefinitionsTest(FakeProgramTestCase):
         self.assertEqual(schema["required"], ["layer", "x1", "y1", "x2", "y2"])
         for key in ("x1", "y1", "x2", "y2"):
             self.assertEqual(schema["properties"][key]["type"], "integer")
+
+    def test_get_shape_needs_one_integer_id(self):
+        schema = {d["name"]: d["input_schema"] for d in self.make_tools().definitions()}["get_shape"]
+        self.assertEqual(schema["required"], ["shape_id"])
+        self.assertEqual(schema["properties"]["shape_id"]["type"], "integer")
 
     def test_definitions_can_be_sent_as_json(self):
         json.dumps(self.make_tools().definitions())  # must not raise
@@ -218,6 +224,36 @@ class WindowToolTest(FakeProgramTestCase):
         result = self.make_tools(stderr=stderr, code=2).run("window_query", self.arguments(x1=10, x2=0))
         self.assertTrue(result.is_error)
         self.assertEqual(result.content, "error: Invalid window: need x1 < x2 and y1 < y2, got x1=10")
+
+
+class GetShapeToolTest(FakeProgramTestCase):
+    SHAPE = {"id": 7, "layer": "via1", "x1": -10, "y1": 0, "x2": 40, "y2": 25}
+
+    def make_shape_tools(self, shape=None, **kwargs):
+        return self.make_tools(stdout=json.dumps({"shape": shape or self.SHAPE}), **kwargs)
+
+    def test_passes_the_id_to_the_program(self):
+        result = self.make_shape_tools().run("get_shape", {"shape_id": 7})
+        self.assertFalse(result.is_error)
+        self.assertEqual(self.program_arguments(), [self.layout_path, "--shape", "7"])
+
+    def test_the_answer_is_the_shape(self):
+        result = self.make_shape_tools().run("get_shape", {"shape_id": 7})
+        self.assertEqual(json.loads(result.content), self.SHAPE)
+
+    def test_bad_arguments_never_reach_the_program(self):
+        for arguments in ({}, {"shape_id": "7"}, {"shape_id": 1.5}, {"shape_id": None},
+                          {"shape_id": True}, {"shape_id": 7, "layer": "metal1"}):
+            with self.subTest(arguments=arguments):
+                result = self.make_shape_tools().run("get_shape", arguments)
+                self.assertTrue(result.is_error, result.content)
+                self.assertFalse(self.program_was_run())
+
+    def test_an_unknown_id_returns_only_the_error_line(self):
+        stderr = "error: Unknown shape id: 999\n"
+        result = self.make_tools(stderr=stderr, code=1).run("get_shape", {"shape_id": 999})
+        self.assertTrue(result.is_error)
+        self.assertEqual(result.content, "error: Unknown shape id: 999")
 
 
 class BadArgumentsTest(FakeProgramTestCase):
@@ -371,6 +407,24 @@ class RealProgramTest(unittest.TestCase):
         self.check_counts(
             self.tools.run("check_overlap", {"layer_a": "metal1", "layer_b": "via1"}),
             self.expected_count("overlap"))
+
+    def test_get_shape_matches_the_layout_file(self):
+        # The ID rule from the README: IDs count 0, 1, 2, ... layer by layer, in file order.
+        shapes = [(layer, rect) for layer, rects in self.layers.items() for rect in rects]
+        for shape_id in (0, 1, len(shapes) // 2, len(shapes) - 1):
+            with self.subTest(shape_id=shape_id):
+                layer, rect = shapes[shape_id]
+                result = self.tools.run("get_shape", {"shape_id": shape_id})
+                self.assertFalse(result.is_error, result.content)
+                self.assertEqual(json.loads(result.content), {
+                    "id": shape_id, "layer": layer,
+                    "x1": rect[0], "y1": rect[1], "x2": rect[2], "y2": rect[3]})
+
+    def test_get_shape_with_an_unknown_id_is_an_error_for_the_llm(self):
+        result = self.tools.run("get_shape", {"shape_id": 10 ** 6})
+        self.assertTrue(result.is_error)
+        self.assertIn("Unknown shape id", result.content)
+        self.assertNotIn("usage", result.content)
 
     def test_an_engine_error_reaches_the_llm_without_the_usage_text(self):
         result = self.tools.run("check_min_width", {"min_width": 0})

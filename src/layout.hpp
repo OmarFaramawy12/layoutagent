@@ -36,6 +36,14 @@ public:
     // Throws std::out_of_range if the layer ID is unknown.
     const std::vector<Rect>& rects(int layer_id) const;
 
+    // The rect with this (global) shape ID, whatever layer it is on. Rects can be added to
+    // the layers in any order, so the IDs of one layer need not be consecutive; the lookup
+    // therefore searches all layers (linear time).
+    // The returned reference stays valid until the next add_rect (the vectors may grow).
+    // Throws std::out_of_range if no shape has this ID. The parameter is 64-bit so any
+    // number a user types can be passed without being cut down to an int first.
+    const Rect& find_rect(std::int64_t shape_id) const;
+
 private:
     void check_layer_id(int id) const;
 

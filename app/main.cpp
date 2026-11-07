@@ -1,10 +1,13 @@
 // The command-line program:
 //   layoutagent <layout.json> [--min-width W] [--min-spacing S] [--overlap LAYER_A LAYER_B]...
 //   layoutagent <layout.json> --window LAYER X1 Y1 X2 Y2
+//   layoutagent <layout.json> --shape ID
 //
 // The first form prints the violations as JSON on stdout. The second prints the IDs of the
-// shapes on LAYER that intersect the window, as {"shape_ids": [...]}; it cannot be combined
-// with the checks. Errors go to stderr as "error: ...".
+// shapes on LAYER that intersect the window, as {"shape_ids": [...]}. The third prints the
+// layer and the corners of the shape with that ID, as {"shape": {...}}. The window and shape
+// queries cannot be combined with each other or with the checks.
+// Errors go to stderr as "error: ...".
 // Exit codes: 0 = the checks ran (with or without violations), 1 = runtime error
 // (bad file, unknown layer name), 2 = usage error (bad command line).
 
@@ -32,6 +35,7 @@ using layoutagent::check_width;
 using layoutagent::Layout;
 using layoutagent::load_layout;
 using layoutagent::shape_ids_to_json;
+using layoutagent::shape_to_json;
 using layoutagent::Violation;
 using layoutagent::violations_to_json;
 using layoutagent::window_query;
@@ -40,7 +44,7 @@ namespace {
 
 const char* const kUsage =
     "usage: layoutagent <layout.json> ([--min-width W] [--min-spacing S] "
-    "[--overlap LAYER_A LAYER_B]... | --window LAYER X1 Y1 X2 Y2)";
+    "[--overlap LAYER_A LAYER_B]... | --window LAYER X1 Y1 X2 Y2 | --shape ID)";
 
 // The arguments of --window.
 struct Window {
@@ -58,6 +62,7 @@ struct Options {
     std::optional<std::int64_t> min_spacing;  // empty = do not run this check
     std::vector<std::pair<std::string, std::string>> overlaps;
     std::optional<Window> window;             // empty = no window query
+    std::optional<std::int64_t> shape;        // empty = no shape query (the shape ID)
 };
 
 // Returns the argument after args[i] and moves i forward by one, so the loop in
@@ -85,6 +90,13 @@ std::int64_t parse_int(const std::string& text, const std::string& option) {
     return value;
 }
 
+// Throws if an option that may be given only once has already been given.
+void check_not_repeated(bool already_given, const std::string& option) {
+    if (already_given) {
+        throw std::invalid_argument(option + " given more than once");
+    }
+}
+
 // Reads the five values after --window (a layer name and four integers) and moves i to the
 // last of them. "option" is the text "--window", used in the error messages.
 Window parse_window(const std::vector<std::string>& args, std::size_t& i,
@@ -99,20 +111,24 @@ Window parse_window(const std::vector<std::string>& args, std::size_t& i,
 }
 
 // Checks the options as a whole once all of them are read: there must be a layout file, and
-// either one or more checks or a window query, but not both.
+// exactly one kind of request: the checks (any of them together), a window query or a shape
+// query.
 void check_combination(const Options& options, bool have_path) {
     if (!have_path) {
         throw std::invalid_argument("missing layout file");
     }
     const bool has_check =
         options.min_width || options.min_spacing || !options.overlaps.empty();
-    if (options.window && has_check) {
+    const int kinds_of_request = (has_check ? 1 : 0) + (options.window ? 1 : 0) +
+                                 (options.shape ? 1 : 0);
+    if (kinds_of_request > 1) {
         throw std::invalid_argument(
-            "--window cannot be combined with --min-width, --min-spacing or --overlap");
+            "--window and --shape cannot be combined with each other or with --min-width, "
+            "--min-spacing or --overlap");
     }
-    if (!options.window && !has_check) {
+    if (kinds_of_request == 0) {
         throw std::invalid_argument(
-            "nothing to check: give --min-width, --min-spacing, --overlap or --window");
+            "nothing to check: give --min-width, --min-spacing, --overlap, --window or --shape");
     }
 }
 
@@ -124,24 +140,21 @@ Options parse_arguments(const std::vector<std::string>& args) {
     for (std::size_t i = 0; i < args.size(); ++i) {
         const std::string& arg = args[i];
         if (arg == "--min-width") {
-            if (options.min_width) {
-                throw std::invalid_argument("--min-width given more than once");
-            }
+            check_not_repeated(options.min_width.has_value(), arg);
             options.min_width = parse_int(take_value(args, i, arg), arg);
         } else if (arg == "--min-spacing") {
-            if (options.min_spacing) {
-                throw std::invalid_argument("--min-spacing given more than once");
-            }
+            check_not_repeated(options.min_spacing.has_value(), arg);
             options.min_spacing = parse_int(take_value(args, i, arg), arg);
         } else if (arg == "--overlap") {
             const std::string& layer_a = take_value(args, i, arg);
             const std::string& layer_b = take_value(args, i, arg);
             options.overlaps.push_back({layer_a, layer_b});  // push_back makes its own copies
         } else if (arg == "--window") {
-            if (options.window) {
-                throw std::invalid_argument("--window given more than once");
-            }
+            check_not_repeated(options.window.has_value(), arg);
             options.window = parse_window(args, i, arg);
+        } else if (arg == "--shape") {
+            check_not_repeated(options.shape.has_value(), arg);
+            options.shape = parse_int(take_value(args, i, arg), arg);
         } else if (arg.rfind("--", 0) == 0) {  // starts with "--"
             throw std::invalid_argument("unknown option " + arg);
         } else {
@@ -173,6 +186,10 @@ int run(const std::vector<std::string>& args, std::ostream& out, std::ostream& e
             const std::vector<int> shape_ids = window_query(
                 layout, layout.layer_id(window.layer), window.x1, window.y1, window.x2, window.y2);
             out << shape_ids_to_json(shape_ids) << '\n';
+            return 0;
+        }
+        if (options.shape) {
+            out << shape_to_json(layout, layout.find_rect(*options.shape)) << '\n';
             return 0;
         }
 

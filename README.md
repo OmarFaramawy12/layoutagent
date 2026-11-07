@@ -48,10 +48,11 @@ build/layoutagent /tmp/demo.json --min-width 50 --min-spacing 40 --overlap metal
 
 ```
 layoutagent <layout.json> ([--min-width W] [--min-spacing S] [--overlap LAYER_A LAYER_B]... |
-                           --window LAYER X1 Y1 X2 Y2)
+                           --window LAYER X1 Y1 X2 Y2 | --shape ID)
 ```
 
-The checks can be combined. `--window` is a separate query and cannot be combined with them.
+The checks can be combined. `--window` and `--shape` are separate queries: they cannot be
+combined with each other or with the checks.
 For a tiny layout `{"layers": {"metal1": [[0, 0, 100, 30], [120, 0, 220, 100]], "via1": [[10, 10, 60, 60]]}}`
 the command `--min-width 50 --min-spacing 40 --overlap metal1 via1` prints, on stdout:
 
@@ -76,6 +77,10 @@ depends on the type:
 | `overlap` | the overlap **area**, in nm² | 0 |
 
 `--window` prints `{"shape_ids": [...]}`: the shapes on that layer that share area with the window.
+`--shape ID` prints `{"shape": {"id": 7, "layer": "via1", "x1": 0, "y1": 0, "x2": 40, "y2": 25}}`:
+the layer and the lower-left and upper-right corners of the shape with that ID (an unknown ID is
+an error, exit code 1). The violations and the window query only give IDs, so this is how a
+caller gets from an ID to a position.
 
 Streams and exit codes: results go to **stdout**, errors to **stderr** as `error: ...`.
 `0` means the checks ran (with or without violations), `1` a runtime error (bad file, unknown
@@ -173,7 +178,7 @@ ninja -C build-release benchmark && ./build-release/benchmark
 ## Natural-language front end
 
 `python -m agent` lets you ask questions about a layout in plain language. The model never sees
-coordinates and never does arithmetic: it chooses one of four tools, `agent/tools.py` runs the
+coordinates and never does arithmetic: it chooses one of five tools, `agent/tools.py` runs the
 C++ program, and the model explains the JSON it gets back.
 
 | tool | runs |
@@ -182,6 +187,7 @@ C++ program, and the model explains the JSON it gets back.
 | `check_min_spacing` | `--min-spacing S` |
 | `check_overlap` | `--overlap LAYER_A LAYER_B` |
 | `window_query` | `--window LAYER X1 Y1 X2 Y2` |
+| `get_shape` | `--shape ID` |
 
 Setup: any chat API that follows the OpenAI "chat completions" format works (NVIDIA NIM, Groq,
 OpenRouter, ...). Put three variables in a file named `.env` (it is in `.gitignore`; never commit
@@ -281,8 +287,8 @@ documented in `eval/scoring.py`: numbers are looked up anywhere in the text.
 - The grid's cell size is the larger of S and the largest shape side, so a single huge shape
   makes the cells huge and the check slow (still correct). Layouts with bounded shape sizes,
   like the generated ones, do not have this problem.
-- The agent answers one question at a time with no memory between questions, and its tools
-  return shape IDs, not coordinates.
+- The agent answers one question at a time with no memory between questions, and it looks
+  shapes up one at a time (`get_shape` takes a single ID).
 - The evaluation uses a single generated layout and 9 cases with one model; it shows that the
   loop works, not how well any model does in general.
 - Developed on Linux (WSL Ubuntu) with GCC. The Windows (MSVC) build is checked only by CI:
@@ -295,7 +301,7 @@ documented in `eval/scoring.py`: numbers are looked up anywhere in the text.
 ```
 src/        the engine: rect.hpp, geometry.hpp, violation.hpp, layout, checks, io_json
 app/        main.cpp (the layoutagent CLI) and benchmark.cpp
-agent/      tools.py (the four tools), llm.py (API client), agent.py (the loop), __main__.py
+agent/      tools.py (the five tools), llm.py (API client), agent.py (the loop), __main__.py
 eval/       cases.json, scoring.py, run_eval.py
 tests/      GoogleTest tests (*.cpp) and Python tests (test_*.py)
 tools/      gen_layout.py (layout generator with planted violations)

@@ -4,6 +4,7 @@
 #include <vector>
 
 #include "layout.hpp"
+#include "rect.hpp"
 #include "violation.hpp"
 
 namespace layoutagent {
@@ -35,5 +36,12 @@ std::string violations_to_json(const Layout& layout, const std::vector<Violation
 // Turns the result of a window query into JSON text: {"shape_ids": [7, 2, 9]}.
 // The order of the IDs is kept; no shapes gives an empty array.
 std::string shape_ids_to_json(const std::vector<int>& shape_ids);
+
+// Turns one shape into JSON text (pretty-printed, 2 spaces), for the shape query:
+//   {"shape": {"id": 7, "layer": "via1", "x1": 0, "y1": 0, "x2": 40, "y2": 25}}
+// The layer is given by name (looked up in the layout); the corners are the lower-left
+// (x1, y1) and upper-right (x2, y2) in nm, as stored.
+// Throws std::out_of_range if the rect has a layer ID the layout does not know.
+std::string shape_to_json(const Layout& layout, const Rect& rect);
 
 }  // namespace layoutagent

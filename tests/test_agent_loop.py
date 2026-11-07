@@ -71,7 +71,8 @@ def calls(*specs):
 class SystemPromptTest(unittest.TestCase):
     def test_names_the_layers_and_the_rules_of_the_game(self):
         prompt = agent_module.build_system_prompt(["metal1", "via1"])
-        for expected in ("metal1", "via1", "total_count", "SQUARED", "nanometres", "ask"):
+        for expected in ("metal1", "via1", "total_count", "SQUARED", "nanometres", "ask",
+                         "get_shape"):
             self.assertIn(expected, prompt)
 
 

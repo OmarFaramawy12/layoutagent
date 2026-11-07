@@ -5,3 +5,4 @@ __pycache__/
 CLAUDE.md
 .env
 build-release/
+build-asan/

@@ -6,6 +6,22 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 add_compile_options(-Wall -Wextra)
 
+# Sanitizers (off by default). Use a separate build directory:
+#   cmake -S . -B build-asan -G Ninja -DCMAKE_BUILD_TYPE=Debug -DLAYOUTAGENT_SANITIZE=ON
+#   ninja -C build-asan && ctest --test-dir build-asan --output-on-failure
+# AddressSanitizer finds memory errors (out-of-range access, use after free, leaks).
+# UndefinedBehaviorSanitizer finds undefined behavior such as signed integer overflow, which
+# matters here because the geometry relies on int64_t arithmetic never overflowing.
+# -fno-sanitize-recover makes the first UB report stop the program with a non-zero exit code,
+# so ctest sees it as a failure (by default UBSan only prints a message and continues).
+# This goes before the tests are added, so GoogleTest is built with the same flags.
+option(LAYOUTAGENT_SANITIZE "Build with AddressSanitizer and UndefinedBehaviorSanitizer" OFF)
+if(LAYOUTAGENT_SANITIZE)
+  add_compile_options(-fsanitize=address,undefined -fno-sanitize-recover=undefined
+                      -fno-omit-frame-pointer)
+  add_link_options(-fsanitize=address,undefined)
+endif()
+
 # nlohmann/json (single header, in third_party/)
 add_library(json INTERFACE)
 target_include_directories(json INTERFACE ${CMAKE_SOURCE_DIR}/third_party)
@@ -17,6 +33,18 @@ target_link_libraries(layoutagent PRIVATE layoutagent_lib)
 # Benchmark: naive spacing check against the grid (build it in a Release build, see the file)
 add_executable(benchmark app/benchmark.cpp)
 target_link_libraries(benchmark PRIVATE layoutagent_lib)
+
+# clang-tidy: "ninja tidy" checks src/ and app/ with the rules in .clang-tidy (only if
+# clang-tidy is installed). It reads build/compile_commands.json for the compiler flags.
+find_program(CLANG_TIDY_EXE NAMES clang-tidy clang-tidy-18 clang-tidy-17 clang-tidy-16 clang-tidy-15)
+if(CLANG_TIDY_EXE)
+  file(GLOB TIDY_SOURCES CONFIGURE_DEPENDS ${CMAKE_SOURCE_DIR}/src/*.cpp ${CMAKE_SOURCE_DIR}/app/*.cpp)
+  add_custom_target(tidy
+    COMMAND ${CLANG_TIDY_EXE} -p ${CMAKE_BINARY_DIR} --quiet ${TIDY_SOURCES}
+    WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+    COMMENT "Running clang-tidy on src/ and app/"
+    VERBATIM)
+endif()
 
 # GoogleTest (downloaded automatically by CMake)
 include(FetchContent)

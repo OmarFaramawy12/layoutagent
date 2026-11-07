@@ -108,7 +108,7 @@ Layout parse_layout(const std::string& json_text) {
 }
 
 Layout load_layout(const std::string& path) {
-    std::ifstream file(path);
+    const std::ifstream file(path);
     if (!file) {
         throw std::runtime_error("Cannot open layout file: " + path);
     }

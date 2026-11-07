@@ -1,0 +1,39 @@
+# clang-tidy configuration. Run it with:  ninja -C build tidy
+# It checks src/ and app/ (not tests, not third_party). Any finding is an error.
+#
+# Chosen on purpose: checks that find bugs (bugprone, clang-analyzer), wasted work
+# (performance), and a few that guard this project's own conventions (braces everywhere,
+# const correctness, initialized variables, no narrowing conversions).
+#
+# Left out on purpose:
+#   bugprone-easily-swappable-parameters   Rect(x1, y1, x2, y2) and the rule values are
+#                                          inherent to the API decided in CLAUDE.md.
+#   misc-non-private-member-variables-in-classes   not relevant to this code.
+#   readability-identifier-length, readability-magic-numbers, modernize-use-trailing-return-type,
+#   modernize-use-nodiscard, modernize-use-emplace   style preferences, not bugs; plain
+#                                          push_back and short loop names are easier to read.
+#   readability-function-cognitive-complexity   parse_arguments and check_spacing_grid are over
+#                                          the default limit; splitting them is a refactor
+#                                          that has not been asked for.
+Checks: >
+  -*,
+  bugprone-*,
+  -bugprone-easily-swappable-parameters,
+  performance-*,
+  clang-analyzer-*,
+  misc-*,
+  -misc-non-private-member-variables-in-classes,
+  readability-braces-around-statements,
+  readability-container-size-empty,
+  readability-else-after-return,
+  readability-redundant-*,
+  readability-simplify-boolean-expr,
+  readability-const-return-type,
+  readability-inconsistent-declaration-parameter-name,
+  modernize-use-nullptr,
+  modernize-loop-convert,
+  modernize-use-override,
+  cppcoreguidelines-init-variables,
+  cppcoreguidelines-narrowing-conversions
+WarningsAsErrors: '*'
+HeaderFilterRegex: '.*/(src|app)/.*'

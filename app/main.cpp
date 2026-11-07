@@ -27,7 +27,7 @@
 #include "violation.hpp"
 
 using layoutagent::check_overlap;
-using layoutagent::check_spacing;
+using layoutagent::check_spacing_grid;
 using layoutagent::check_width;
 using layoutagent::Layout;
 using layoutagent::load_layout;
@@ -171,7 +171,7 @@ int run(const std::vector<std::string>& args, std::ostream& out, std::ostream& e
         }
         if (options.min_spacing) {
             for (int id = 0; id < layout.layer_count(); ++id) {
-                append(violations, check_spacing(layout, id, *options.min_spacing));
+                append(violations, check_spacing_grid(layout, id, *options.min_spacing));
             }
         }
         for (const auto& pair : options.overlaps) {

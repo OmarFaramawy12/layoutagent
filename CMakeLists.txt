@@ -14,6 +14,10 @@ target_include_directories(json INTERFACE ${CMAKE_SOURCE_DIR}/third_party)
 add_executable(layoutagent app/main.cpp)
 target_link_libraries(layoutagent PRIVATE layoutagent_lib)
 
+# Benchmark: naive spacing check against the grid (build it in a Release build, see the file)
+add_executable(benchmark app/benchmark.cpp)
+target_link_libraries(benchmark PRIVATE layoutagent_lib)
+
 # GoogleTest (downloaded automatically by CMake)
 include(FetchContent)
 FetchContent_Declare(googletest
@@ -56,6 +60,10 @@ gtest_discover_tests(test_layout)
 add_executable(test_checks tests/test_checks.cpp)
 target_link_libraries(test_checks PRIVATE layoutagent_lib GTest::gtest_main)
 gtest_discover_tests(test_checks)
+
+add_executable(test_spacing_grid tests/test_spacing_grid.cpp)
+target_link_libraries(test_spacing_grid PRIVATE layoutagent_lib GTest::gtest_main)
+gtest_discover_tests(test_spacing_grid)
 
 add_executable(test_io_json tests/test_io_json.cpp)
 target_link_libraries(test_io_json PRIVATE layoutagent_lib json GTest::gtest_main)

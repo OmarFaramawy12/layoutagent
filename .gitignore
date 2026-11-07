@@ -4,3 +4,4 @@ __pycache__/
 .vscode/
 CLAUDE.md
 .env
+build-release/

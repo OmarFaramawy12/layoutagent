@@ -1,10 +1,12 @@
 #include "checks.hpp"
 
-#include <algorithm>  // std::min
+#include <algorithm>  // std::min, std::max, std::sort, std::unique
 #include <cstddef>    // std::size_t
+#include <map>
 #include <optional>
 #include <stdexcept>
 #include <string>
+#include <utility>    // std::pair
 
 #include "geometry.hpp"
 #include "rect.hpp"
@@ -46,6 +48,9 @@ Rect make_window(std::int64_t x1, std::int64_t y1, std::int64_t x2, std::int64_t
     }
 }
 
+// A grid cell (column, row).
+using Cell = std::pair<std::int64_t, std::int64_t>;
+
 }  // namespace
 
 std::vector<Violation> check_width(const Layout& layout, int layer_id,
@@ -84,6 +89,85 @@ std::vector<Violation> check_spacing(const Layout& layout, int layer_id,
                                   .layer_a = layer_id,
                                   .layer_b = layer_id,
                                   .first_shape_id = rects[i].shape_id(),
+                                  .second_shape_id = rects[j].shape_id(),
+                                  .measured = distance_sq,
+                                  .required = required});
+            }
+        }
+    }
+    return result;
+}
+
+std::vector<Violation> check_spacing_grid(const Layout& layout, int layer_id,
+                                          std::int64_t min_spacing) {
+    check_rule_value(min_spacing, "Spacing rule");
+
+    const std::vector<Rect>& rects = layout.rects(layer_id);
+    const std::int64_t required = min_spacing * min_spacing;
+
+    // Cell size: at least the rule value, and at least the largest side of any shape, so a
+    // shape covers at most 2 x 2 cells (memory stays small). A layer with one huge shape gets
+    // huge cells: slower, but still correct.
+    std::int64_t cell_size = min_spacing;
+    for (const Rect& rect : rects) {
+        cell_size = std::max(cell_size, std::max(rect.width(), rect.height()));
+    }
+
+    // Cell of a coordinate = coordinate / cell_size. C++ integer division rounds toward ZERO,
+    // so -5 / 10 is 0, like +5 / 10: cell 0 is simply twice as wide as the others. That is fine:
+    // a bigger coordinate never gets a smaller cell number, so two shapes that overlap in
+    // space always get overlapping ranges of cells, which is all the search below needs.
+
+    // The grid: for every cell, the indexes (into `rects`) of the shapes that touch it.
+    // std::map with a pair as key needs no hash function (pairs compare with <).
+    std::map<Cell, std::vector<std::size_t>> grid;
+    for (std::size_t i = 0; i < rects.size(); ++i) {
+        const Rect& rect = rects[i];
+        for (std::int64_t column = rect.x1() / cell_size;
+             column <= rect.x2() / cell_size; ++column) {
+            for (std::int64_t row = rect.y1() / cell_size;
+                 row <= rect.y2() / cell_size; ++row) {
+                grid[{column, row}].push_back(i);
+            }
+        }
+    }
+
+    // For every shape i: collect the shapes j > i that share a cell with i's search box
+    // (i grown by min_spacing on every side), then run the exact test on those only.
+    // A pair closer than min_spacing has gaps below min_spacing on both axes, so j always
+    // touches the search box and the two share a cell: the grid never misses a violation.
+    std::vector<Violation> result;
+    std::vector<std::size_t> candidates;  // reused for every i, so it is allocated rarely
+    for (std::size_t i = 0; i < rects.size(); ++i) {
+        const Rect& a = rects[i];
+        candidates.clear();
+        for (std::int64_t column = (a.x1() - min_spacing) / cell_size;
+             column <= (a.x2() + min_spacing) / cell_size; ++column) {
+            for (std::int64_t row = (a.y1() - min_spacing) / cell_size;
+                 row <= (a.y2() + min_spacing) / cell_size; ++row) {
+                const auto cell = grid.find({column, row});
+                if (cell == grid.end()) {
+                    continue;  // nothing in this cell
+                }
+                for (const std::size_t j : cell->second) {
+                    if (j > i) {
+                        candidates.push_back(j);
+                    }
+                }
+            }
+        }
+        // A shape in several cells is found several times; sorting and removing the repeats
+        // also puts the candidates in the order the naive check visits them (j ascending).
+        std::sort(candidates.begin(), candidates.end());
+        candidates.erase(std::unique(candidates.begin(), candidates.end()), candidates.end());
+
+        for (const std::size_t j : candidates) {
+            const std::int64_t distance_sq = squared_distance(a, rects[j]);
+            if (distance_sq < required) {
+                result.push_back({.type = ViolationType::MinSpacing,
+                                  .layer_a = layer_id,
+                                  .layer_b = layer_id,
+                                  .first_shape_id = a.shape_id(),
                                   .second_shape_id = rects[j].shape_id(),
                                   .measured = distance_sq,
                                   .required = required});

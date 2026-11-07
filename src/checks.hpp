@@ -27,6 +27,12 @@ std::vector<Violation> check_width(const Layout& layout, int layer_id,
 std::vector<Violation> check_spacing(const Layout& layout, int layer_id,
                                      std::int64_t min_spacing);
 
+// The same check as check_spacing, but using a spatial grid so that only shapes in nearby
+// cells are compared. Returns exactly the same violations in exactly the same order as
+// check_spacing (tests/test_spacing_grid.cpp checks this), and throws the same exceptions.
+std::vector<Violation> check_spacing_grid(const Layout& layout, int layer_id,
+                                          std::int64_t min_spacing);
+
 // Cross-layer overlap check (naive O(n*m)): reports every pair (a on layer_a, b on layer_b)
 // that shares positive area, i.e. gap_x < 0 and gap_y < 0. Touching along an edge or at
 // a corner is not an overlap. Overlaps inside one layer are not reported.

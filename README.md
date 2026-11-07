@@ -1,5 +1,7 @@
 # LayoutAgent
 
+[![CI](https://github.com/OmarFaramawy12/layoutagent/actions/workflows/ci.yml/badge.svg)](https://github.com/OmarFaramawy12/layoutagent/actions/workflows/ci.yml)
+
 A small design-rule checker (DRC) for IC layouts, with a natural-language front end.
 
 - A **C++20 engine** stores axis-aligned rectangles on layers and finds rule violations
@@ -262,6 +264,9 @@ documented in `eval/scoring.py`: numbers are looked up anywhere in the text.
 - **clang-tidy:** `ninja -C build tidy` checks `src/` and `app/` with the rules in `.clang-tidy`
   (bug-finding and performance checks plus a few that guard the conventions above); any finding
   is an error.
+- **CI** (`.github/workflows/ci.yml`, GitHub Actions on Ubuntu 24.04): every push to `main` and
+  every pull request runs the full suite in a Debug and a Release build, again under the
+  sanitizers, and clang-tidy (version 15, pinned). The Python tests need no network or API key.
 
 ## Limitations
 
@@ -275,8 +280,8 @@ documented in `eval/scoring.py`: numbers are looked up anywhere in the text.
   return shape IDs, not coordinates.
 - The evaluation uses a single generated layout and 9 cases with one model; it shows that the
   loop works, not how well any model does in general.
-- Built and tested on Linux (WSL Ubuntu) with GCC. There is no CI yet, and Windows has not been
-  tried.
+- Built and tested on Linux (WSL Ubuntu) with GCC. GitHub Actions runs the Debug and Release
+  tests, the sanitizer build and clang-tidy on Ubuntu; Windows has not been tried.
 
 ## Project layout
 

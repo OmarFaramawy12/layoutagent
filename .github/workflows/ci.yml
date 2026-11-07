@@ -1,0 +1,64 @@
+name: CI
+
+# Runs on every push to main and on every pull request.
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+# The workflow only needs to read the code.
+permissions:
+  contents: read
+
+jobs:
+  # The whole test suite (C++ GoogleTest tests and the Python tests that run the real CLI),
+  # in a Debug and a Release build: optimization can change how undefined behaviour shows up.
+  test:
+    name: Build and test (${{ matrix.build_type }})
+    runs-on: ubuntu-24.04
+    strategy:
+      matrix:
+        build_type: [Debug, Release]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Ninja
+        run: sudo apt-get update && sudo apt-get install -y ninja-build
+      - name: Configure
+        run: cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=${{ matrix.build_type }}
+      - name: Build
+        run: ninja -C build
+      - name: Test
+        run: ctest --test-dir build --output-on-failure
+
+  # The same tests under AddressSanitizer and UndefinedBehaviorSanitizer.
+  sanitizers:
+    name: Tests under ASan and UBSan
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Ninja
+        run: sudo apt-get update && sudo apt-get install -y ninja-build
+      - name: Configure
+        run: cmake -S . -B build-asan -G Ninja -DCMAKE_BUILD_TYPE=Debug -DLAYOUTAGENT_SANITIZE=ON
+      - name: Build
+        run: ninja -C build-asan
+      - name: Test
+        run: ctest --test-dir build-asan --output-on-failure
+
+  # clang-tidy on src/ and app/ with the rules in .clang-tidy. Version 15 is pinned because
+  # the rules were chosen with it; newer versions add checks that would need a fresh look.
+  # CLANG_TIDY_EXE gives CMake the exact program, so a different clang-tidy that may already
+  # be on the runner's PATH is never picked up by accident.
+  clang-tidy:
+    name: clang-tidy
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Ninja and clang-tidy 15
+        run: sudo apt-get update && sudo apt-get install -y ninja-build clang-tidy-15
+      - name: Configure
+        run: cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Debug -DCLANG_TIDY_EXE=/usr/bin/clang-tidy-15
+      - name: Check the pinned version
+        run: /usr/bin/clang-tidy-15 --version
+      - name: Run clang-tidy
+        run: ninja -C build tidy

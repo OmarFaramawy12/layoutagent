@@ -87,6 +87,18 @@ if(Python3_FOUND)
            COMMAND ${Python3_EXECUTABLE} -m unittest discover -s ${CMAKE_SOURCE_DIR}/tests -p test_agent_llm.py
            WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
 
+  # Tests of the evaluation scoring in eval/scoring.py (pure Python)
+  add_test(NAME eval_scoring_python_tests
+           COMMAND ${Python3_EXECUTABLE} -m unittest discover -s ${CMAKE_SOURCE_DIR}/tests -p test_eval_scoring.py
+           WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
+
+  # Tests of the evaluation runner and eval/cases.json, using a scripted fake LLM
+  add_test(NAME eval_runner_python_tests
+           COMMAND ${Python3_EXECUTABLE} -m unittest discover -s ${CMAKE_SOURCE_DIR}/tests -p test_eval_runner.py
+           WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
+  set_tests_properties(eval_runner_python_tests PROPERTIES
+                       ENVIRONMENT "LAYOUTAGENT_CLI=$<TARGET_FILE:layoutagent>")
+
   # Tests of the agent loop and its terminal front end, using a scripted fake LLM
   add_test(NAME agent_loop_python_tests
            COMMAND ${Python3_EXECUTABLE} -m unittest discover -s ${CMAKE_SOURCE_DIR}/tests -p test_agent_loop.py

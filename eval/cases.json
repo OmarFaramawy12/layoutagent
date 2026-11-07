@@ -1,0 +1,33 @@
+{
+  "layout": {"seed": 5, "count": 200},
+  "cases": [
+    {"id": "width_basic",
+     "question": "Which shapes are narrower than 50 nm?",
+     "expect": {"tool": "check_min_width", "arguments": {"min_width": 50}}},
+    {"id": "width_rephrased",
+     "question": "How many shapes break a minimum width rule of 30 nm?",
+     "expect": {"tool": "check_min_width", "arguments": {"min_width": 30}}},
+    {"id": "spacing_basic",
+     "question": "How many spacing violations are there if the minimum spacing is 60 nm?",
+     "expect": {"tool": "check_min_spacing", "arguments": {"min_spacing": 60}}},
+    {"id": "spacing_rephrased",
+     "question": "Are any two shapes on the same layer closer than 20 nm to each other?",
+     "expect": {"tool": "check_min_spacing", "arguments": {"min_spacing": 20}}},
+    {"id": "overlap_basic",
+     "question": "Do any metal1 shapes overlap via1 shapes? How many pairs?",
+     "expect": {"tool": "check_overlap", "arguments": {"layer_a": "metal1", "layer_b": "via1"}}},
+    {"id": "overlap_reversed_names",
+     "question": "Count the overlaps between via1 and metal1.",
+     "expect": {"tool": "check_overlap", "arguments": {"layer_a": "metal1", "layer_b": "via1"}}},
+    {"id": "overlap_none",
+     "question": "Is there any overlap between metal1 and metal2?",
+     "expect": {"tool": "check_overlap", "arguments": {"layer_a": "metal1", "layer_b": "metal2"}}},
+    {"id": "window_basic",
+     "question": "Which metal1 shapes intersect the window from (0, 0) to (1000, 1000)?",
+     "expect": {"tool": "window_query",
+                "arguments": {"layer": "metal1", "x1": 0, "y1": 0, "x2": 1000, "y2": 1000}}},
+    {"id": "ask_for_missing_number",
+     "question": "Check the layout for minimum width violations.",
+     "expect": {"tool": null}}
+  ]
+}

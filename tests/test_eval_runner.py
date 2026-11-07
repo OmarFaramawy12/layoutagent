@@ -63,6 +63,12 @@ class LoadCasesTest(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "check_everything"):
             self.load(good_document(cases=[case]))
 
+    def test_a_shape_case_is_accepted(self):
+        case = {"id": "s", "question": "Where is shape 3?",
+                "expect": {"tool": "get_shape", "arguments": {"shape_id": 3}}}
+        _, cases = self.load(good_document(cases=[case]))
+        self.assertEqual(cases[0]["id"], "s")
+
     def test_a_tool_case_needs_arguments(self):
         case = dict(good_document()["cases"][0], expect={"tool": "check_min_width"})
         with self.assertRaisesRegex(ValueError, "arguments"):
@@ -111,6 +117,13 @@ class ExpectedAnswerTest(unittest.TestCase):
                            "violations": []})
         self.assertEqual(run_eval.expected_answer(tools, self.EXPECT), (0, None))
 
+    def test_a_shape_query_gives_its_four_corner_numbers_and_no_count(self):
+        tools = StubTools({"id": 19, "layer": "metal1", "x1": 1040, "y1": 4040,
+                           "x2": 1108, "y2": 4065})
+        expect = {"tool": "get_shape", "arguments": {"shape_id": 19}}
+        self.assertEqual(run_eval.expected_answer(tools, expect),
+                         (None, {1040, 4040, 1108, 4065}))
+
     def test_a_case_that_expects_no_tool(self):
         self.assertEqual(run_eval.expected_answer(StubTools({}), {"tool": None}), (None, None))
 
@@ -129,8 +142,11 @@ class OracleLLM:
     def chat(self, messages, tools):
         expect = self.by_question[messages[1]["content"]]
         if messages[-1]["role"] == "tool":
-            count = json.loads(messages[-1]["content"])["total_count"]
-            return {"role": "assistant", "content": "Found %d." % count}
+            answer = json.loads(messages[-1]["content"])
+            if "x1" in answer:  # a shape query: state the corners
+                corners = [answer[key] for key in ("x1", "y1", "x2", "y2")]
+                return {"role": "assistant", "content": "Corners: %s." % corners}
+            return {"role": "assistant", "content": "Found %d." % answer["total_count"]}
         if expect["tool"] is None:
             return {"role": "assistant", "content": "Which value should I use?"}
         return {"role": "assistant", "content": None, "tool_calls": [

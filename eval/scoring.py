@@ -11,6 +11,9 @@ Known weakness: both checks only look for numbers anywhere in the text, so a cou
 equals another number in the answer (for example the "50" of "50 nm", or a coordinate repeated
 from the question) can be matched by accident. Cases must be written so that the counts and
 IDs differ from the numbers in their question; tests/test_eval_runner.py checks this.
+
+A shape query ("get_shape") has no count: its answer is right if it states all four corner
+coordinates of the shape (passed in as expected_ids).
 """
 
 import re
@@ -68,8 +71,9 @@ def score_case(case, tool_calls, answer, finished, expected_count, expected_ids=
     the engine returned (the natural answer to "which shapes ...?"). expected_ids is None
     when the engine's list was cut off, so only the count can be checked."""
     tool_ok = tool_was_called_correctly(case["expect"], tool_calls)
-    answer_ok = (expected_count is None
-                 or answer_mentions_count(answer, expected_count)
+    nothing_to_check = expected_count is None and not expected_ids
+    answer_ok = (nothing_to_check
+                 or (expected_count is not None and answer_mentions_count(answer, expected_count))
                  or answer_lists_ids(answer, expected_ids))
     return CaseScore(case["id"], tool_ok, answer_ok, finished, finished and tool_ok and answer_ok)
 

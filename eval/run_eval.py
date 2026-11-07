@@ -25,7 +25,8 @@ from agent.tools import DrcTools  # noqa: E402
 from eval import scoring  # noqa: E402
 
 DEFAULT_CASES = os.path.join(ROOT, "eval", "cases.json")
-TOOL_NAMES = {"check_min_width", "check_min_spacing", "check_overlap", "window_query"}
+TOOL_NAMES = {"check_min_width", "check_min_spacing", "check_overlap", "window_query",
+              "get_shape"}
 
 
 def load_cases(path):
@@ -71,16 +72,21 @@ def make_tools(layout, folder):
 
 
 def expected_answer(tools, expect):
-    """The right answer, from the C++ engine, as (count, shape IDs).
+    """The right answer, from the C++ engine, as (count, numbers the answer must contain).
 
-    Both are None when the case has no count to check. The IDs are None too when there are
-    none, or when the engine's list was cut off (then only the count can be checked)."""
+    Both are None when the case has no count to check. For a violation or window query the
+    numbers are the shape IDs: None when there are none, or when the engine's list was cut
+    off (then only the count can be checked). For a shape query there is no count, and the
+    numbers are the four corner coordinates."""
     if expect["tool"] is None:
         return None, None
     result = tools.run(expect["tool"], expect["arguments"])
     if result.is_error:
         raise ValueError("the expected call %s failed: %s" % (expect["tool"], result.content))
     answer = json.loads(result.content)
+
+    if expect["tool"] == "get_shape":  # the answer is the shape itself: no count
+        return None, {answer[key] for key in ("x1", "y1", "x2", "y2")}
 
     ids = set(answer.get("shape_ids", []))  # window query
     for violation in answer.get("violations", []):

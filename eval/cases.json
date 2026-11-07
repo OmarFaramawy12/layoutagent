@@ -26,6 +26,9 @@
      "question": "Which metal1 shapes intersect the window from (0, 5000) to (3000, 8000)?",
      "expect": {"tool": "window_query",
                 "arguments": {"layer": "metal1", "x1": 0, "y1": 5000, "x2": 3000, "y2": 8000}}},
+    {"id": "shape_position",
+     "question": "Where exactly is shape 19, and which layer is it on?",
+     "expect": {"tool": "get_shape", "arguments": {"shape_id": 19}}},
     {"id": "ask_for_missing_number",
      "question": "Check the layout for minimum width violations.",
      "expect": {"tool": null}}

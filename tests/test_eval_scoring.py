@@ -150,6 +150,15 @@ class ScoreCaseTest(unittest.TestCase):
         self.assertTrue(score.answer_ok)
         self.assertTrue(score.passed)
 
+    def test_without_a_count_the_listed_numbers_must_all_be_in_the_answer(self):
+        # A shape query has no count: the answer must state every number given (the corners).
+        right = self.score([WIDTH_50], answer="From (1040, 4040) to (1108, 4065).", count=None,
+                           ids={1040, 4040, 1108, 4065})
+        wrong = self.score([WIDTH_50], answer="From (1040, 4040) to (1108, 9999).", count=None,
+                           ids={1040, 4040, 1108, 4065})
+        self.assertTrue(right.answer_ok)
+        self.assertFalse(wrong.answer_ok)
+
     def test_a_case_that_expects_no_tool_passes_without_calls(self):
         case = {"id": "ask", "expect": {"tool": None}}
         self.assertTrue(self.score([], answer="Which width?", case=case, count=None).passed)

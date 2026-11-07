@@ -246,7 +246,8 @@ Result with `nvidia/nemotron-3-nano-omni-30b-a3b-reasoning` on NVIDIA NIM: the m
 right tool with the right arguments in all 9 cases, about 4,000 tokens per case. The first full
 run showed 2 answer failures; both were a flaw in my scoring (it demanded the count from
 "which shapes" answers, while the model had listed exactly the right IDs), not a mistake of the
-model. After fixing the scoring, all 9 cases pass. The scoring weakness that remains is
+model. After fixing the scoring, all 9 cases pass. The `get_shape` case, added later, was run on its
+own and passes too (about 3,700 tokens), so all 10 cases pass; the full set was not re-run. The scoring weakness that remains is
 documented in `eval/scoring.py`: numbers are looked up anywhere in the text.
 
 ## How it is tested
@@ -289,7 +290,7 @@ documented in `eval/scoring.py`: numbers are looked up anywhere in the text.
   like the generated ones, do not have this problem.
 - The agent answers one question at a time with no memory between questions, and it looks
   shapes up one at a time (`get_shape` takes a single ID).
-- The evaluation uses a single generated layout and 9 cases with one model; it shows that the
+- The evaluation uses a single generated layout and 10 cases with one model; it shows that the
   loop works, not how well any model does in general.
 - Developed on Linux (WSL Ubuntu) with GCC. The Windows (MSVC) build is checked only by CI:
   the sanitizer build and clang-tidy are Linux-only, and `python -m agent` on Windows needs the

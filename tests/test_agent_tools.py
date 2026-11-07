@@ -353,6 +353,47 @@ class ConstructionTest(FakeProgramTestCase):
         with self.assertRaises(ValueError):
             tools.DrcTools(self.layout_path, program=["unused"])
 
+    def make_program(self, *parts):
+        """Creates an empty file build/<parts> under the temporary folder; returns its path."""
+        path = os.path.join(self.folder, "build", *parts)
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        with open(path, "w"):
+            pass
+        return path
+
+    def default_path(self):
+        with mock.patch.dict(os.environ, clear=True):  # no LAYOUTAGENT_CLI
+            return tools.default_program_path(self.folder)
+
+    def test_default_path_finds_the_linux_program(self):
+        path = self.make_program("layoutagent")
+        self.assertEqual(self.default_path(), path)
+
+    def test_default_path_finds_the_windows_program(self):
+        path = self.make_program("layoutagent.exe")
+        self.assertEqual(self.default_path(), path)
+
+    def test_default_path_finds_a_visual_studio_build(self):
+        # The Visual Studio generator puts the program in build/<configuration>/.
+        path = self.make_program("Release", "layoutagent.exe")
+        self.assertEqual(self.default_path(), path)
+
+    def test_default_path_takes_the_newest_build(self):
+        old = self.make_program("Debug", "layoutagent.exe")
+        new = self.make_program("Release", "layoutagent.exe")
+        os.utime(old, (1_000_000, 1_000_000))
+        os.utime(new, (2_000_000, 2_000_000))
+        self.assertEqual(self.default_path(), new)
+
+    def test_default_path_without_a_build_names_the_plain_path(self):
+        # Nothing exists: the path is still given, so the error message says where it looked.
+        self.assertEqual(self.default_path(), os.path.join(self.folder, "build", "layoutagent"))
+
+    def test_the_environment_variable_wins(self):
+        self.make_program("layoutagent")
+        with mock.patch.dict(os.environ, {"LAYOUTAGENT_CLI": "/somewhere/else"}):
+            self.assertEqual(tools.default_program_path(self.folder), "/somewhere/else")
+
     def test_default_program_must_exist(self):
         with mock.patch.dict(os.environ, {"LAYOUTAGENT_CLI": os.path.join(self.folder, "missing")}):
             with self.assertRaises(FileNotFoundError):

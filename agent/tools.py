@@ -33,10 +33,23 @@ class BadArguments(ValueError):
     """The LLM called a tool with arguments that do not fit its description."""
 
 
-def default_program_path():
-    """The built layoutagent program: $LAYOUTAGENT_CLI, or build/layoutagent in the repo."""
-    root = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..")
-    return os.environ.get("LAYOUTAGENT_CLI", os.path.join(root, "build", "layoutagent"))
+def default_program_path(root=None):
+    """The built layoutagent program: $LAYOUTAGENT_CLI, or the newest build found under
+    build/ in the repo. Linux builds make build/layoutagent; Windows builds make
+    layoutagent.exe, and the Visual Studio generator puts it in build/Debug or build/Release.
+    If none exists, the plain build/layoutagent is returned, so the error says where we looked.
+    "root" (the repo folder) is a parameter only so that tests can point it elsewhere."""
+    if "LAYOUTAGENT_CLI" in os.environ:
+        return os.environ["LAYOUTAGENT_CLI"]
+    if root is None:
+        root = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..")
+    build = os.path.join(root, "build")
+    candidates = [os.path.join(build, "layoutagent"),
+                  os.path.join(build, "layoutagent.exe"),
+                  os.path.join(build, "Release", "layoutagent.exe"),
+                  os.path.join(build, "Debug", "layoutagent.exe")]
+    found = [path for path in candidates if os.path.isfile(path)]
+    return max(found, key=os.path.getmtime) if found else candidates[0]
 
 
 def object_without_duplicate_keys(pairs):

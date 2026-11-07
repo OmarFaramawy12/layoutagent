@@ -293,9 +293,10 @@ documented in `eval/scoring.py`: numbers are looked up anywhere in the text.
 - The evaluation uses a single generated layout and 10 cases with one model; it shows that the
   loop works, not how well any model does in general.
 - Developed on Linux (WSL Ubuntu) with GCC. The Windows (MSVC) build is checked only by CI:
-  the sanitizer build and clang-tidy are Linux-only, and `python -m agent` on Windows needs the
-  `LAYOUTAGENT_CLI` environment variable set to the path of `layoutagent.exe`, because the
-  default path `build/layoutagent` has no `.exe`.
+  the sanitizer build and clang-tidy are Linux-only. `python -m agent` looks for
+  `build/layoutagent`, `build/layoutagent.exe` and the Visual Studio folders `build/Release`
+  and `build/Debug`, and uses the newest one it finds (the lookup is unit-tested with fake
+  files, but not run on a real Windows machine). `LAYOUTAGENT_CLI` overrides it.
 
 ## Project layout
 

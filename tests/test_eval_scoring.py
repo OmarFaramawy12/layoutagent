@@ -70,11 +70,41 @@ class AnswerMentionsCountTest(unittest.TestCase):
         self.assertFalse(scoring.answer_mentions_count("Found 5 violations.", 0))
 
 
+class AnswerListsIdsTest(unittest.TestCase):
+    def test_all_ids_listed(self):
+        self.assertTrue(scoring.answer_lists_ids("IDs: 19, 39 and 46.", {19, 39, 46}))
+
+    def test_a_missing_id_fails(self):
+        self.assertFalse(scoring.answer_lists_ids("IDs: 19 and 39.", {19, 39, 46}))
+
+    def test_extra_numbers_are_fine(self):
+        self.assertTrue(scoring.answer_lists_ids("19, 39 (2 shapes, 50 nm)", {19, 39}))
+
+    def test_nothing_to_check_without_ids(self):
+        self.assertFalse(scoring.answer_lists_ids("anything", None))
+        self.assertFalse(scoring.answer_lists_ids("anything", set()))
+
+
 class ScoreCaseTest(unittest.TestCase):
     CASE = {"id": "width", "expect": {"tool": "check_min_width", "arguments": {"min_width": 50}}}
 
-    def score(self, calls, answer="Found 18 shapes.", finished=True, case=None, count=18):
-        return scoring.score_case(case or self.CASE, calls, answer, finished, count)
+    def score(self, calls, answer="Found 18 shapes.", finished=True, case=None, count=18,
+              ids=None):
+        return scoring.score_case(case or self.CASE, calls, answer, finished, count, ids)
+
+    def test_listing_every_id_is_enough_without_the_count(self):
+        score = self.score([WIDTH_50], answer="Shapes 19, 39 and 46.", ids={19, 39, 46})
+        self.assertTrue(score.answer_ok)
+        self.assertTrue(score.passed)
+
+    def test_listing_only_some_ids_without_the_count_fails(self):
+        self.assertFalse(self.score([WIDTH_50], answer="Shapes 19 and 39.", ids={19, 39, 46}).answer_ok)
+
+    def test_the_right_count_is_enough_even_without_the_ids(self):
+        self.assertTrue(self.score([WIDTH_50], answer="18 shapes.", ids={19, 39, 46}).answer_ok)
+
+    def test_a_wrong_count_and_no_ids_fails(self):
+        self.assertFalse(self.score([WIDTH_50], answer="17 shapes.", ids={19, 39, 46}).answer_ok)
 
     def test_everything_right_passes(self):
         score = self.score([WIDTH_50])

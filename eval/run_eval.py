@@ -70,14 +70,24 @@ def make_tools(layout, folder):
     return DrcTools(prefix + ".json")
 
 
-def expected_count(tools, expect):
-    """The right answer, from the C++ engine. None when the case has no count to check."""
+def expected_answer(tools, expect):
+    """The right answer, from the C++ engine, as (count, shape IDs).
+
+    Both are None when the case has no count to check. The IDs are None too when there are
+    none, or when the engine's list was cut off (then only the count can be checked)."""
     if expect["tool"] is None:
-        return None
+        return None, None
     result = tools.run(expect["tool"], expect["arguments"])
     if result.is_error:
         raise ValueError("the expected call %s failed: %s" % (expect["tool"], result.content))
-    return json.loads(result.content)["total_count"]
+    answer = json.loads(result.content)
+
+    ids = set(answer.get("shape_ids", []))  # window query
+    for violation in answer.get("violations", []):
+        ids |= {violation["first_shape_id"], violation["second_shape_id"]} - {None}
+    if answer["truncated"] or not ids:
+        ids = None
+    return answer["total_count"], ids
 
 
 def format_report(rows, summary, tokens):
@@ -122,10 +132,10 @@ def main(argv=None, llm=None, out=None, err=None):
             tools = make_tools(layout, folder)
             agent = Agent(llm, tools)
             for case in cases:
-                count = expected_count(tools, case["expect"])
+                count, ids = expected_answer(tools, case["expect"])
                 result = agent.ask(case["question"])
                 score = scoring.score_case(case, result.tool_calls, result.answer,
-                                           result.finished, count)
+                                           result.finished, count, ids)
                 rows.append((case, score, result))
     except (LLMError, OSError, ValueError, RuntimeError) as error:
         print("error: " + str(error), file=err)

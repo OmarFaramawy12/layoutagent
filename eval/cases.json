@@ -23,9 +23,9 @@
      "question": "Is there any overlap between metal1 and metal2?",
      "expect": {"tool": "check_overlap", "arguments": {"layer_a": "metal1", "layer_b": "metal2"}}},
     {"id": "window_basic",
-     "question": "Which metal1 shapes intersect the window from (0, 0) to (1000, 1000)?",
+     "question": "Which metal1 shapes intersect the window from (0, 5000) to (3000, 8000)?",
      "expect": {"tool": "window_query",
-                "arguments": {"layer": "metal1", "x1": 0, "y1": 0, "x2": 1000, "y2": 1000}}},
+                "arguments": {"layer": "metal1", "x1": 0, "y1": 5000, "x2": 3000, "y2": 8000}}},
     {"id": "ask_for_missing_number",
      "question": "Check the layout for minimum width violations.",
      "expect": {"tool": null}}

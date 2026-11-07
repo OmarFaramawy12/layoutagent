@@ -12,6 +12,7 @@ from unittest import mock
 
 ROOT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..")
 sys.path.insert(0, ROOT)
+from agent.tools import ToolResult  # noqa: E402
 from eval import run_eval, scoring  # noqa: E402
 
 CLI = os.environ.get("LAYOUTAGENT_CLI", os.path.join(ROOT, "build", "layoutagent"))
@@ -76,6 +77,48 @@ class LoadCasesTest(unittest.TestCase):
             self.load({"cases": good_document()["cases"]})
 
 
+class StubTools:
+    """Returns one canned tool answer."""
+
+    def __init__(self, content, is_error=False):
+        self.result = ToolResult(json.dumps(content), is_error)
+
+    def run(self, name, arguments):
+        return self.result
+
+
+class ExpectedAnswerTest(unittest.TestCase):
+    EXPECT = {"tool": "check_min_width", "arguments": {"min_width": 50}}
+
+    def test_violations_give_the_count_and_all_shape_ids(self):
+        tools = StubTools({"total_count": 2, "returned_count": 2, "truncated": False, "violations": [
+            {"first_shape_id": 5, "second_shape_id": None},
+            {"first_shape_id": 7, "second_shape_id": 9}]})
+        self.assertEqual(run_eval.expected_answer(tools, self.EXPECT), (2, {5, 7, 9}))
+
+    def test_a_window_query_gives_its_shape_ids(self):
+        tools = StubTools({"total_count": 2, "returned_count": 2, "truncated": False,
+                           "shape_ids": [3, 4]})
+        self.assertEqual(run_eval.expected_answer(tools, self.EXPECT), (2, {3, 4}))
+
+    def test_a_truncated_answer_has_no_complete_id_list(self):
+        tools = StubTools({"total_count": 300, "returned_count": 50, "truncated": True,
+                           "shape_ids": [3, 4]})
+        self.assertEqual(run_eval.expected_answer(tools, self.EXPECT), (300, None))
+
+    def test_no_violations_gives_no_ids(self):
+        tools = StubTools({"total_count": 0, "returned_count": 0, "truncated": False,
+                           "violations": []})
+        self.assertEqual(run_eval.expected_answer(tools, self.EXPECT), (0, None))
+
+    def test_a_case_that_expects_no_tool(self):
+        self.assertEqual(run_eval.expected_answer(StubTools({}), {"tool": None}), (None, None))
+
+    def test_a_failing_expected_call_is_reported(self):
+        with self.assertRaisesRegex(ValueError, "failed"):
+            run_eval.expected_answer(StubTools({}, is_error=True), self.EXPECT)
+
+
 class OracleLLM:
     """Always behaves perfectly: calls the expected tool, then reports the engine's count."""
 
@@ -102,6 +145,19 @@ class LazyLLM:
         return {"role": "assistant", "content": "I do not know."}
 
 
+class ListingLLM(OracleLLM):
+    """Answers a "which" question the natural way: lists the IDs and never says the count."""
+
+    def chat(self, messages, tools):
+        if messages[-1]["role"] != "tool":
+            return super().chat(messages, tools)
+        answer = json.loads(messages[-1]["content"])
+        ids = set(answer.get("shape_ids", []))
+        for violation in answer.get("violations", []):
+            ids |= {violation["first_shape_id"], violation["second_shape_id"]} - {None}
+        return {"role": "assistant", "content": "IDs: " + ", ".join(map(str, sorted(ids)))}
+
+
 class BrokenLLM:
     def chat(self, messages, tools):
         raise run_eval.LLMError("the LLM returned HTTP 401: invalid key")
@@ -117,19 +173,25 @@ class RealCasesFileTest(unittest.TestCase):
         self.assertIn(None, [c["expect"]["tool"] for c in cases])  # at least one "ask" case
         self.assertIn(0, self.counts(layout, cases))               # at least one "none found" case
 
-    def test_no_count_equals_a_number_in_its_question(self):
-        # The scoring finds the count anywhere in the answer, so a count that is also in the
-        # question (for example "50 nm" and 50 violations) could be matched by accident.
+    def test_no_count_or_id_equals_a_number_in_its_question(self):
+        # The scoring looks for the count (or the IDs) anywhere in the answer, so a count or
+        # ID that is also in the question (for example "50 nm" and 50 violations) could be
+        # matched by accident, for instance by an answer that just repeats the question.
         layout, cases = run_eval.load_cases(CASES_PATH)
-        for case, count in zip(cases, self.counts(layout, cases)):
-            if count is not None:
-                self.assertNotIn(count, scoring.numbers_in(case["question"]) - {0}, case["id"])
+        for case, (count, ids) in zip(cases, self.answers(layout, cases)):
+            in_question = scoring.numbers_in(case["question"])
+            if count not in (None, 0):
+                self.assertNotIn(count, in_question, case["id"])
+            self.assertFalse((ids or set()) & in_question, case["id"])
 
     def counts(self, layout, cases):
+        return [count for count, _ in self.answers(layout, cases)]
+
+    def answers(self, layout, cases):
         with tempfile.TemporaryDirectory() as folder:
             with mock.patch.dict(os.environ, {"LAYOUTAGENT_CLI": CLI}):
                 tools = run_eval.make_tools(layout, folder)
-                return [run_eval.expected_count(tools, c["expect"]) for c in cases]
+                return [run_eval.expected_answer(tools, c["expect"]) for c in cases]
 
 
 @unittest.skipUnless(os.path.isfile(CLI), "the layoutagent program is not built")
@@ -152,6 +214,12 @@ class MainTest(unittest.TestCase):
         self.assertIn("Tokens used: 123", out)
         for case in self.cases:
             self.assertIn(case["id"], out)
+
+    def test_listing_the_ids_without_the_count_passes(self):
+        code, out, _ = self.run_main(["--only", "width_basic", "window_basic"],
+                                     ListingLLM(self.cases))
+        self.assertEqual(code, 0)
+        self.assertIn("Passed 2 of 2 cases", out)
 
     def test_a_model_that_never_calls_tools_fails_the_tool_cases(self):
         code, out, err = self.run_main([], LazyLLM())

@@ -49,15 +49,23 @@ jobs:
   # the rules were chosen with it; newer versions add checks that would need a fresh look.
   # CLANG_TIDY_EXE gives CMake the exact program, so a different clang-tidy that may already
   # be on the runner's PATH is never picked up by accident.
+  # The runner also has GCC 14 installed, and clang-tidy 15 picks the NEWEST GCC's standard
+  # library headers, which it cannot parse (errors inside <chrono> and <ranges>). So the
+  # project is configured with g++-13, and -nostdinc++ plus the GCC 13 include directories
+  # keep clang-tidy away from the GCC 14 headers completely.
   clang-tidy:
     name: clang-tidy
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
-      - name: Install Ninja and clang-tidy 15
-        run: sudo apt-get update && sudo apt-get install -y ninja-build clang-tidy-15
+      - name: Install Ninja, g++ 13 and clang-tidy 15
+        run: sudo apt-get update && sudo apt-get install -y ninja-build g++-13 clang-tidy-15
       - name: Configure
-        run: cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Debug -DCLANG_TIDY_EXE=/usr/bin/clang-tidy-15
+        run: >
+          cmake -S . -B build -G Ninja -DCMAKE_BUILD_TYPE=Debug
+          -DCMAKE_CXX_COMPILER=g++-13
+          -DCLANG_TIDY_EXE=/usr/bin/clang-tidy-15
+          "-DCLANG_TIDY_EXTRA_ARGS=--extra-arg=-nostdinc++;--extra-arg=-isystem/usr/include/c++/13;--extra-arg=-isystem/usr/include/x86_64-linux-gnu/c++/13;--extra-arg=-isystem/usr/include/c++/13/backward"
       - name: Check the pinned version
         run: /usr/bin/clang-tidy-15 --version
       - name: Run clang-tidy

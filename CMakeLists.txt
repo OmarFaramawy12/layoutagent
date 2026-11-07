@@ -37,10 +37,13 @@ target_link_libraries(benchmark PRIVATE layoutagent_lib)
 # clang-tidy: "ninja tidy" checks src/ and app/ with the rules in .clang-tidy (only if
 # clang-tidy is installed). It reads build/compile_commands.json for the compiler flags.
 find_program(CLANG_TIDY_EXE NAMES clang-tidy clang-tidy-18 clang-tidy-17 clang-tidy-16 clang-tidy-15)
+# Optional extra clang-tidy arguments as a ;-separated list, e.g. "--extra-arg=-nostdinc++".
+# CI uses it to keep an old clang-tidy away from standard library headers it cannot parse.
+set(CLANG_TIDY_EXTRA_ARGS "" CACHE STRING "Extra arguments for clang-tidy (;-separated)")
 if(CLANG_TIDY_EXE)
   file(GLOB TIDY_SOURCES CONFIGURE_DEPENDS ${CMAKE_SOURCE_DIR}/src/*.cpp ${CMAKE_SOURCE_DIR}/app/*.cpp)
   add_custom_target(tidy
-    COMMAND ${CLANG_TIDY_EXE} -p ${CMAKE_BINARY_DIR} --quiet ${TIDY_SOURCES}
+    COMMAND ${CLANG_TIDY_EXE} -p ${CMAKE_BINARY_DIR} --quiet ${CLANG_TIDY_EXTRA_ARGS} ${TIDY_SOURCES}
     WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
     COMMENT "Running clang-tidy on src/ and app/"
     VERBATIM)

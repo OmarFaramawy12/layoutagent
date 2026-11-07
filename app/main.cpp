@@ -85,6 +85,37 @@ std::int64_t parse_int(const std::string& text, const std::string& option) {
     return value;
 }
 
+// Reads the five values after --window (a layer name and four integers) and moves i to the
+// last of them. "option" is the text "--window", used in the error messages.
+Window parse_window(const std::vector<std::string>& args, std::size_t& i,
+                    const std::string& option) {
+    Window window;
+    window.layer = take_value(args, i, option);
+    window.x1 = parse_int(take_value(args, i, option), option);
+    window.y1 = parse_int(take_value(args, i, option), option);
+    window.x2 = parse_int(take_value(args, i, option), option);
+    window.y2 = parse_int(take_value(args, i, option), option);
+    return window;
+}
+
+// Checks the options as a whole once all of them are read: there must be a layout file, and
+// either one or more checks or a window query, but not both.
+void check_combination(const Options& options, bool have_path) {
+    if (!have_path) {
+        throw std::invalid_argument("missing layout file");
+    }
+    const bool has_check =
+        options.min_width || options.min_spacing || !options.overlaps.empty();
+    if (options.window && has_check) {
+        throw std::invalid_argument(
+            "--window cannot be combined with --min-width, --min-spacing or --overlap");
+    }
+    if (!options.window && !has_check) {
+        throw std::invalid_argument(
+            "nothing to check: give --min-width, --min-spacing, --overlap or --window");
+    }
+}
+
 // Every problem with the command line is reported by throwing std::invalid_argument.
 Options parse_arguments(const std::vector<std::string>& args) {
     Options options;
@@ -110,13 +141,7 @@ Options parse_arguments(const std::vector<std::string>& args) {
             if (options.window) {
                 throw std::invalid_argument("--window given more than once");
             }
-            Window window;
-            window.layer = take_value(args, i, arg);
-            window.x1 = parse_int(take_value(args, i, arg), arg);
-            window.y1 = parse_int(take_value(args, i, arg), arg);
-            window.x2 = parse_int(take_value(args, i, arg), arg);
-            window.y2 = parse_int(take_value(args, i, arg), arg);
-            options.window = window;
+            options.window = parse_window(args, i, arg);
         } else if (arg.rfind("--", 0) == 0) {  // starts with "--"
             throw std::invalid_argument("unknown option " + arg);
         } else {
@@ -128,19 +153,7 @@ Options parse_arguments(const std::vector<std::string>& args) {
         }
     }
 
-    if (!have_path) {
-        throw std::invalid_argument("missing layout file");
-    }
-    const bool has_check =
-        options.min_width || options.min_spacing || !options.overlaps.empty();
-    if (options.window && has_check) {
-        throw std::invalid_argument(
-            "--window cannot be combined with --min-width, --min-spacing or --overlap");
-    }
-    if (!options.window && !has_check) {
-        throw std::invalid_argument(
-            "nothing to check: give --min-width, --min-spacing, --overlap or --window");
-    }
+    check_combination(options, have_path);
     return options;
 }
 

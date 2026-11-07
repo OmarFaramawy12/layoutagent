@@ -12,9 +12,9 @@
 #   readability-identifier-length, readability-magic-numbers, modernize-use-trailing-return-type,
 #   modernize-use-nodiscard, modernize-use-emplace   style preferences, not bugs; plain
 #                                          push_back and short loop names are easier to read.
-#   readability-function-cognitive-complexity   parse_arguments and check_spacing_grid are over
-#                                          the default limit; splitting them is a refactor
-#                                          that has not been asked for.
+#
+# readability-function-cognitive-complexity is on with its default limit of 25 (the highest
+# function today, parse_arguments, scores 20): a function that grows past it should be split.
 Checks: >
   -*,
   bugprone-*,
@@ -25,6 +25,7 @@ Checks: >
   -misc-non-private-member-variables-in-classes,
   readability-braces-around-statements,
   readability-container-size-empty,
+  readability-function-cognitive-complexity,
   readability-else-after-return,
   readability-redundant-*,
   readability-simplify-boolean-expr,

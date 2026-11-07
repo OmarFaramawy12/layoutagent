@@ -249,6 +249,16 @@ class ErrorsTest(unittest.TestCase):
         self.assert_fails([self.good, "--min-width", "50", "--min-width", "60"], 2,
                           "--min-width", "usage:")
 
+    def test_min_spacing_twice(self):
+        self.assert_fails([self.good, "--min-spacing", "40", "--min-spacing", "50"], 2,
+                          "--min-spacing", "usage:")
+
+    def test_window_cannot_be_combined_with_any_check(self):
+        window = ["--window", "metal1", "0", "0", "10", "10"]
+        for check in (["--min-spacing", "40"], ["--overlap", "metal1", "via1"]):
+            self.assert_fails([self.good, *window, *check], 2, "combined", "usage:")
+            self.assert_fails([self.good, *check, *window], 2, "combined", "usage:")  # either order
+
     def test_window_needs_five_values(self):
         self.assert_fails([self.good, "--window", "metal1", "0", "0"], 2, "--window", "usage:")
 
